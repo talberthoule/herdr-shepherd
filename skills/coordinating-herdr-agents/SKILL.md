@@ -194,7 +194,7 @@ node "$HOME/.codex/skills/coordinating-herdr-agents/scripts/coordinate.mjs" --st
 JSON
 ```
 
-The hook records attempted and outcome events, redacts obvious secrets, and opens one loopback audit viewer tab per viewer process for proactive sends. The viewer defaults to succeeded events. Use **Viewed & close** to acknowledge; closing the tab alone leaves entries unseen and keeps the viewer process available for later updates.
+The hook records attempted and outcome events, redacts obvious secrets, and opens one loopback audit viewer tab per viewer process for proactive sends. The viewer defaults to the `succeeded` phase, which it displays as **sent**: the wrapper typed the message and pressed Enter, which is not proof the target submitted or read it. Treat the viewer as a record of what was attempted, and confirm delivery by pane read. Use **Viewed & close** to acknowledge; closing the tab alone leaves entries unseen and keeps the viewer process available for later updates.
 
 ## Quick Reference
 
@@ -207,7 +207,7 @@ The hook records attempted and outcome events, redacts obvious secrets, and open
 | Share findings, verdicts, or decisions | Write to the durable record, then send its ID |
 | No durable record bound yet | Run Durable Record Setup before relying on pointer sends |
 | Perform user-requested mutation | Audited wrapper with `origin: user-directed` |
-| Inspect audit | Viewer opens one tab per viewer process after proactive sends, defaults to succeeded events, shows newest events first, and supports deleting one action or all history |
+| Inspect audit | Viewer opens one tab per viewer process after proactive sends, defaults to the `succeeded` phase shown as **sent** (typed, not confirmed delivered), shows newest events first, and supports deleting one action or all history |
 
 ## Common Mistakes
 

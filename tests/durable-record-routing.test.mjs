@@ -82,6 +82,32 @@ test('transport reliability separates ACK from proof of submission', async () =>
   assert.match(section, /submits a duplicate of work already done/);
 });
 
+test('viewer labels the succeeded phase as sent without changing the stored value', async () => {
+  const viewer = await readFile(
+    join(root, 'skills', 'coordinating-herdr-agents', 'scripts', 'audit-server.mjs'),
+    'utf8',
+  );
+  // The wire/query value must remain the stored phase so the events API keeps working.
+  assert.match(viewer, /<option value="succeeded" selected>sent<\/option>/);
+  assert.match(viewer, /<option value="attempted">attempted<\/option>/);
+  assert.match(viewer, /<option value="failed">failed<\/option>/);
+  // The rendered label comes from the map, not from the raw phase.
+  assert.match(viewer, /PHASE_LABEL=\{[^}]*succeeded:'sent'/);
+  assert.match(viewer, /esc\(PHASE_LABEL\[e\.phase\]\|\|e\.phase\)/);
+  assert.doesNotMatch(viewer, /<span class="'\+esc\(e\.phase\)\+'">'\+esc\(e\.phase\)/);
+  // A standing legend states what "sent" does and does not prove.
+  assert.match(viewer, /does not confirm the target submitted or read it/);
+  assert.match(viewer, /Confirm delivery by pane read/);
+  assert.match(viewer, /PHASE_TITLE=\{[^}]*Delivery is unconfirmed/);
+});
+
+test('skill describes the viewer label honestly', async () => {
+  const skill = await readFile(skillPath, 'utf8');
+  assert.match(skill, /displays as \*\*sent\*\*/);
+  assert.match(skill, /not proof the target submitted or read it/);
+  assert.doesNotMatch(skill, /The viewer defaults to succeeded events\./);
+});
+
 test('AGENTS.md and CLAUDE.md mirror the new sections verbatim', async () => {
   const skill = await readFile(skillPath, 'utf8');
   for (const heading of [routingHeading, setupHeading]) {

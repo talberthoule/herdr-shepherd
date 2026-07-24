@@ -94,7 +94,8 @@ test('viewer offers a status filter and formats local time with a short zone nam
   t.after(() => viewer.close());
   const page = await (await fetch(`${viewer.url}/?token=test-token`)).text();
   assert.match(page, /<select id="status"/);
-  assert.match(page, /<option value="succeeded" selected>succeeded<\/option>/);
+  // Wire value stays the stored phase; the label is honest about what it proves.
+  assert.match(page, /<option value="succeeded" selected>sent<\/option>/);
   assert.match(page, /document\.title=.*d\.events\.length/);
   assert.match(page, /timeZoneName:'short'/);
   assert.match(page, /e\.occurred_at/);
