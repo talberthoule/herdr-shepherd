@@ -118,6 +118,53 @@ A send is keystrokes typed into the target composer plus a delayed Enter, so del
 6. Verify claimed branches and commits in git before acting on any branch-ready claim.
 7. Do not reply to ACKs of ACKs.
 8. Inbound sends stomp any in-progress typing in the target composer, including the user's, so suppress unsolicited routine chatter toward user-facing coordinator panes — lanes volunteer only substantive events (branch- or patch-ready with sha, verdicts, blockers, decision questions). A message explicitly marked ACK-requested still requires a compact ACK: silence cannot prove delivery, because a stuck composer is indistinguishable from understood. The sender owns delivery recovery — wait about 20 seconds, then pane read, then resend — so a human pressing Enter is never the fallback. Broadcast protocol changes with an explicit do-not-acknowledge marker so the change itself does not trigger an ACK storm.
+9. An ACK proves the recipient holds the content, not that your send delivered it. A capable recipient may pull the content by pane read while your message sits unsubmitted in its composer, so an ACK can arrive from a send that never landed. Confirm submission by pane read: text still visible in the composer, or a queue hint such as `tab to queue message`, means unsubmitted. Once the recipient has already acted on the content, do not resend to flush its stuck composer — the fresh Enter submits a duplicate of work already done. Have the user clear it instead.
+
+## Routing Substance and Pointers
+
+Sends are lossy, so never make a send the only carrier of anything that matters. Write substance to a durable record first, then send a pointer to it. A dropped, truncated, or unsubmitted send then costs a delay instead of the content.
+
+Route by how long the content needs to survive:
+
+| Tier | Content | Channel |
+|---|---|---|
+| Durable | Findings, verdicts, decisions and their rationale, blockers, plans, declined alternatives, status | Durable record (tracker issue, or the fallback in Durable Record Setup) |
+| Pointer | "ALP-135 updated, review comment added, needs your call on the drain deadline" | `agent send`, referencing the record ID |
+| Ephemeral | ACKs, liveness, lane claims, standing down | Pane read or `agent send`; never the durable record |
+
+Do not route everything to the durable record. Trackers do not push to a terminal agent, so a tracker round trip is far too slow for a collision warning; an issue whose thread is forty ACKs destroys the signal the record exists to carry; and most coordination — capability checks, lane claims, "are you idle" — has no issue to attach to.
+
+Pane read is the only channel that cannot be dropped, because it is a pull. It complements the pointer send; it does not replace it.
+
+### Attribution in the durable record
+
+Most trackers are reached through one shared credential, so every agent's issue and comment is authored by the human who owns the token. The tracker's own author field cannot tell two agents apart. Attribution must therefore be written into the body:
+
+```text
+Requested by: <runtime> (<pane>) - <role>
+Performed by: <runtime> (<pane>) - <role>
+Date: <ISO date>
+Scope: <what this agent was and was not allowed to do>
+```
+
+Pane IDs are slot identifiers and get reused, so `w2:pJ` means nothing weeks later. The role is the durable half — "spec owner" and "independent reviewer" still parse after the panes are gone. Record the pane as a dated breadcrumb, not as identity.
+
+## Durable Record Setup
+
+When a repository has no durable record bound yet, establish one before relying on pointer sends. Do not silently invent a location, and do not fall back to pane scrollback.
+
+1. **Check what is already reachable** before proposing anything: a connected tracker MCP server or CLI, a GitHub remote with `gh` authenticated, or neither. Never offer a tracker whose capability you have not confirmed in this session.
+2. **Offer the ranked options with a recommendation**, and let the user choose:
+   - An issue tracker already connected in this session (Linear, Jira, GitHub Issues, Asana) — best, because it is searchable, threaded, and already authenticated.
+   - GitHub Issues through `gh` on the repo's existing remote — no signup, works in any GitHub-backed repo.
+   - Git-native: committed Markdown under a coordination directory on the default branch — always available, no external service, reviewable in the same diff as the code.
+   - A shared file at a stable absolute path — last resort; durable only on one machine, so say so.
+3. **Walk the signup and configuration** for the chosen option rather than handing over a link. Confirm the workspace or repository, create or identify the container (project, label, or directory), and confirm the naming convention for records.
+4. **Prove it round-trips** before declaring it ready: write one probe record, read it back by ID, then delete or clearly mark the probe. An unverified binding is not a durable record.
+5. **Record the binding where future agents will read it** — the repo's `CLAUDE.md` or `AGENTS.md`, naming the system, the exact container, and the ID format. This is what makes the choice survive context loss; a binding held only in one session is not configured.
+6. **Report what was created**, including anything the user now owns externally (a new account, project, or label), so nothing external appears without their knowledge.
+
+Treat missing credentials as a stop, not a workaround: ask the user to authenticate rather than downgrading to a less durable tier on their behalf.
 
 ## Receiving Coordination Messages
 
@@ -157,6 +204,8 @@ The hook records attempted and outcome events, redacts obvious secrets, and open
 | Suspect parallel code changes | Match same-repo panes, read likely owners, message only for overlap |
 | Recover pane context | `herdr pane read <id> --source recent-unwrapped` |
 | Coordinate ownership | Audited `agent send` wrapper |
+| Share findings, verdicts, or decisions | Write to the durable record, then send its ID |
+| No durable record bound yet | Run Durable Record Setup before relying on pointer sends |
 | Perform user-requested mutation | Audited wrapper with `origin: user-directed` |
 | Inspect audit | Viewer opens one tab per viewer process after proactive sends, defaults to succeeded events, shows newest events first, and supports deleting one action or all history |
 
@@ -174,3 +223,9 @@ The hook records attempted and outcome events, redacts obvious secrets, and open
 - Do not inline long payloads in a send. A send that races a busy composer arrives head-truncated; keep sends compact, number multi-part sends, and verify delivery by pane read.
 - Do not judge overlap by tab label. Read the other agent's plan; near-identical work often hides behind different names.
 - Do not treat a dirty worktree alone as proof of parallel work.
+- Do not treat an ACK as proof your send was submitted. The recipient may have pulled the content by pane read while your message sat unsubmitted.
+- Do not resend to flush a stuck composer once the recipient has acted on the content; that submits a duplicate. Have the user clear it.
+- Do not make a send the only carrier of a finding, verdict, or decision. Write it to the durable record first and send the ID.
+- Do not route ACKs, liveness, or lane claims into the durable record; that noise destroys the signal the record exists to carry.
+- Do not rely on a tracker's author field to identify an agent. One shared credential means every agent writes as the human; put attribution in the body.
+- Do not invent a durable location when none is bound. Run Durable Record Setup and let the user choose.
