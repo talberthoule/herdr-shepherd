@@ -116,8 +116,8 @@ test('marketplace manifests expose the herdr plugin id', async () => {
   const claudeMarket = JSON.parse(await readFile(join(root, '.claude-plugin/marketplace.json'), 'utf8'));
   assert.equal(codexPlugin.name, 'herdr-shepherd');
   assert.equal(claudePlugin.name, 'herdr-shepherd');
-  assert.equal(codexMarket.name, 'herdr');
-  assert.equal(claudeMarket.name, 'herdr');
+  assert.equal(codexMarket.name, 'shepherd');
+  assert.equal(claudeMarket.name, 'shepherd');
   assert.equal(codexMarket.plugins[0].name, 'herdr-shepherd');
   assert.equal(claudeMarket.plugins[0].name, 'herdr-shepherd');
 });
