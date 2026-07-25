@@ -39,6 +39,18 @@ test('worktree guidance describes the silent-breakage failure mode', async () =>
   assert.match(section, /Commit early on a worktree lane/);
 });
 
+test('guidance separates sync damage from a self-held working directory', async () => {
+  const section = extractSection(await readFile(skillPath, 'utf8'));
+  assert.match(section, /Two unrelated faults produce look-alike symptoms/);
+  // The distinguishing signal: is .git actually gone, or is the directory merely locked?
+  assert.match(section, /Device or resource busy/);
+  assert.match(section, /Permission denied/);
+  assert.match(section, /a shell still has the directory as its working directory/);
+  assert.match(section, /leave the directory and retry; the worktree is fine/);
+  assert.match(section, /the process holding the lock is usually your own/);
+  assert.match(section, /Confirm the `\.git` file is actually missing before concluding/);
+});
+
 test('corollary count matches the number of corollary bullets', async () => {
   const section = extractSection(await readFile(skillPath, 'utf8'));
   const declared = section.match(/^(\w+) corollaries that are easy to get wrong:$/m);
@@ -57,4 +69,5 @@ test('common mistakes cover sync-root worktrees and false-clean status', async (
   assert.match(mistakes, /Do not create a worktree inside a cloud-synced folder/);
   assert.match(mistakes, /Do not read an empty `git -C <dir> status` as a clean worktree/);
   assert.match(mistakes, /counting output lines scores it identical to clean/);
+  assert.match(mistakes, /Do not blame the sync client for a locked worktree/);
 });

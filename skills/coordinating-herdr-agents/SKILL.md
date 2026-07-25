@@ -74,6 +74,15 @@ Three corollaries that are easy to get wrong:
 
 A worktree broken this way is silent and looks healthy. The directory is still there, `git worktree list` may still list it, and only the operations fail: `git -C <path> status` errors, `git worktree remove` refuses with "not a working tree", and `git worktree prune` quietly drops the registration while leaving the directory behind. Anything uncommitted in it is unrecoverable, because git no longer has a handle on it. One repository lost every worktree it had this way, twice within an hour, and survived only because each lane had already been merged. Commit early on a worktree lane; an uncommitted checkout there is not durable storage.
 
+Two unrelated faults produce look-alike symptoms, and treating the second as the first destroys a healthy worktree:
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| `.git` file missing; `git -C <path> status` errors; remove says "not a working tree" | sync client destroyed the pointer file | prune the registration, recreate the lane outside the sync root |
+| `.git` intact; move, remove, or delete fails with "Permission denied" or "Device or resource busy" | a shell still has the directory as its working directory | leave the directory and retry; the worktree is fine |
+
+The second is self-inflicted and common, because inspecting a worktree means entering it and agent shells persist their working directory between calls — so the process holding the lock is usually your own. Confirm the `.git` file is actually missing before concluding the sync client is at fault.
+
 Also check whether the project's containers/toolchain bind the *main* checkout; if they do, a worktree cannot run the stack, and it suits docs/review/analysis rather than code that needs integration testing.
 
 ## Stacking Work Across Lanes
@@ -223,6 +232,7 @@ The hook records attempted and outcome events, redacts obvious secrets, and open
 - Do not `checkout`, `checkout -b`, `merge`, or `stash` in a shared working tree before confirming who holds it — you will sweep another agent's uncommitted work onto your branch.
 - Do not park on `main` in a worktree. It blocks the tree-holder's merge, and nothing tells you that you did it.
 - Do not create a worktree inside a cloud-synced folder. The sync client breaks its `.git` pointer file, and uncommitted work in it becomes unrecoverable.
+- Do not blame the sync client for a locked worktree. "Permission denied" or "Device or resource busy" almost always means a shell still has it as its working directory — usually your own, from an earlier inspection. Check whether `.git` is actually missing first.
 - Do not read an empty `git -C <dir> status` as a clean worktree. On a broken worktree the command fails and prints nothing, so counting output lines scores it identical to clean. Check the command succeeded before trusting the result.
 - Do not rely on a submitted `agent send` to stop an imminent collision. It is a queued message, not an interrupt. Escalate time-critical conflicts to the user.
 - Do not inline long payloads in a send. A send that races a busy composer arrives head-truncated; keep sends compact, number multi-part sends, and verify delivery by pane read.
