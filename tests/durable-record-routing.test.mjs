@@ -6,7 +6,7 @@ import test from 'node:test';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, '..');
-const skillPath = join(root, 'skills', 'coordinating-herdr-agents', 'SKILL.md');
+const skillPath = join(root, 'skills', 'herdr-shepherd', 'SKILL.md');
 const mirrorPaths = [join(root, 'AGENTS.md'), join(root, 'CLAUDE.md')];
 
 const routingHeading = '## Routing Substance and Pointers';
@@ -84,7 +84,7 @@ test('transport reliability separates ACK from proof of submission', async () =>
 
 test('viewer labels the succeeded phase as sent without changing the stored value', async () => {
   const viewer = await readFile(
-    join(root, 'skills', 'coordinating-herdr-agents', 'scripts', 'audit-server.mjs'),
+    join(root, 'skills', 'herdr-shepherd', 'scripts', 'audit-server.mjs'),
     'utf8',
   );
   // The wire/query value must remain the stored phase so the events API keeps working.

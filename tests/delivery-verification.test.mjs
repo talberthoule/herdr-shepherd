@@ -8,12 +8,12 @@ import test from 'node:test';
 import {
   deliveryVerdict,
   executeCoordinationRequest,
-} from '../skills/coordinating-herdr-agents/scripts/coordinate.mjs';
-import { handleHookPayload } from '../skills/coordinating-herdr-agents/scripts/hook-lib.mjs';
+} from '../skills/herdr-shepherd/scripts/coordinate.mjs';
+import { handleHookPayload } from '../skills/herdr-shepherd/scripts/hook-lib.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const fakeHerdr = join(here, 'fake-herdr.mjs');
-const skillPath = join(here, '..', 'skills', 'coordinating-herdr-agents', 'SKILL.md');
+const skillPath = join(here, '..', 'skills', 'herdr-shepherd', 'SKILL.md');
 
 function request() {
   return {
@@ -107,7 +107,7 @@ test('the audit event records the delivery verdict', async () => {
 
 test('viewer renders the delivery verdict with its own explanation', async () => {
   const viewer = await readFile(
-    join(here, '..', 'skills', 'coordinating-herdr-agents', 'scripts', 'audit-server.mjs'),
+    join(here, '..', 'skills', 'herdr-shepherd', 'scripts', 'audit-server.mjs'),
     'utf8',
   );
   assert.match(viewer, /DELIVERY_TITLE=\{[^}]*unconfirmed:/);

@@ -2,7 +2,7 @@
 
 ## Goal
 
-Make Herdr Agent Coordination a genuine two-command plugin install for Codex and Claude Code, while retaining simple native installers for Windows and Linux. Rewrite the README to lead with the coordination value and show useful workflows before implementation detail.
+Make Herdr Shepherd a genuine two-command plugin install for Codex and Claude Code, while retaining simple native installers for Windows and Linux. Rewrite the README to lead with the coordination value and show useful workflows before implementation detail.
 
 ## Product promise
 
@@ -19,20 +19,20 @@ Primary use cases:
 
 ## Distribution
 
-The public repository becomes a marketplace for both hosts under the marketplace name `herdr`.
+The public repository becomes a marketplace for both hosts under the marketplace name `shepherd`.
 
 Codex:
 
 ```sh
-codex plugin marketplace add talberthoule/coordinating-herdr-agents
-codex plugin add coordinating-herdr-agents@herdr
+codex plugin marketplace add talberthoule/herdr-shepherd
+codex plugin add herdr-shepherd@shepherd
 ```
 
 Claude Code:
 
 ```sh
-claude plugin marketplace add talberthoule/coordinating-herdr-agents
-claude plugin install coordinating-herdr-agents@herdr
+claude plugin marketplace add talberthoule/herdr-shepherd
+claude plugin install herdr-shepherd@shepherd
 ```
 
 Both plugins contain the skill and hooks. Users still review and trust hooks through the host's normal security flow.
@@ -53,7 +53,7 @@ Use the plugin layout shared by both hosts:
 - `.claude-plugin/plugin.json`: Claude manifest;
 - `.agents/plugins/marketplace.json`: Codex marketplace;
 - `.claude-plugin/marketplace.json`: Claude marketplace;
-- `skills/coordinating-herdr-agents/`: the single skill, metadata, references, and Node runtime;
+- `skills/herdr-shepherd/`: the single skill, metadata, references, and Node runtime;
 - `hooks/hooks.json`: Codex hook events;
 - `hooks/claude.json`: Claude events, including `PostToolUseFailure`;
 - root `install.*` and `uninstall.*`: manual fallbacks;

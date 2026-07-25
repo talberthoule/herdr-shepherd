@@ -1,7 +1,7 @@
 {
-  "name": "coordinating-herdr-agents",
+  "name": "herdr-shepherd",
   "version": "0.1.0",
-  "description": "Coordinate Codex and Claude Code sessions through Herdr with audited handoffs and a local activity trail.",
+  "description": "Herdr Shepherd coordinates Codex and Claude Code sessions through Herdr with audited handoffs and a local activity trail.",
   "author": {
     "name": "Talbert Houle",
     "url": "https://github.com/talberthoule"

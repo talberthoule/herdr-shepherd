@@ -2,13 +2,13 @@
 param([switch]$PurgeAuditHistory)
 
 $ErrorActionPreference = 'Stop'
-$skillRoot = Join-Path (Split-Path -Parent $MyInvocation.MyCommand.Path) 'skills\coordinating-herdr-agents'
+$skillRoot = Join-Path (Split-Path -Parent $MyInvocation.MyCommand.Path) 'skills\herdr-shepherd'
 $codexHome = if ($env:CODEX_HOME) { $env:CODEX_HOME } else { Join-Path $HOME '.codex' }
 $claudeHome = Join-Path $HOME '.claude'
 $codexHooks = Join-Path $codexHome 'hooks.json'
 $claudeSettings = Join-Path $claudeHome 'settings.json'
-$claudeLink = Join-Path $claudeHome 'skills\coordinating-herdr-agents'
-$stateDir = Join-Path $env:LOCALAPPDATA 'Herdr\coordination-audit'
+$claudeLink = Join-Path $claudeHome 'skills\herdr-shepherd'
+$stateDir = Join-Path $env:LOCALAPPDATA 'Herdr\shepherd-audit'
 $codexInstalled = [bool](Get-Command codex -ErrorAction SilentlyContinue)
 $claudeInstalled = [bool](Get-Command claude -ErrorAction SilentlyContinue)
 
@@ -39,10 +39,10 @@ if ($claudeInstalled -and (Test-Path -LiteralPath $claudeLink)) {
 
 if ($PurgeAuditHistory -and (Test-Path -LiteralPath $stateDir)) {
     $resolved = [IO.Path]::GetFullPath($stateDir)
-    $expected = [IO.Path]::GetFullPath((Join-Path $env:LOCALAPPDATA 'Herdr\coordination-audit'))
+    $expected = [IO.Path]::GetFullPath((Join-Path $env:LOCALAPPDATA 'Herdr\shepherd-audit'))
     if ($resolved -ne $expected) { throw "Refusing to purge unexpected path: $resolved" }
     Remove-Item -LiteralPath $resolved -Recurse -Force
 }
 
-Write-Host 'Removed Herdr coordination hooks.'
+Write-Host 'Removed Herdr Shepherd hooks.'
 if (-not $PurgeAuditHistory) { Write-Host "Preserved audit history at $stateDir" }

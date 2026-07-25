@@ -5,13 +5,13 @@ purge_audit_history=0
 [ "${1:-}" = "--purge-audit-history" ] && purge_audit_history=1
 
 repo_root=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
-skill_root="$repo_root/skills/coordinating-herdr-agents"
+skill_root="$repo_root/skills/herdr-shepherd"
 codex_home="${CODEX_HOME:-$HOME/.codex}"
 claude_home="$HOME/.claude"
 codex_hooks="$codex_home/hooks.json"
 claude_settings="$claude_home/settings.json"
-claude_link="$claude_home/skills/coordinating-herdr-agents"
-state_dir="${XDG_STATE_HOME:-$HOME/.local/state}/Herdr/coordination-audit"
+claude_link="$claude_home/skills/herdr-shepherd"
+state_dir="${XDG_STATE_HOME:-$HOME/.local/state}/Herdr/shepherd-audit"
 
 codex_arg="-"
 claude_arg="-"
@@ -28,10 +28,10 @@ fi
 
 rm -f "$state_dir/viewer.json"
 if [ "$purge_audit_history" -eq 1 ] && [ -d "$state_dir" ]; then
-  expected="${XDG_STATE_HOME:-$HOME/.local/state}/Herdr/coordination-audit"
+  expected="${XDG_STATE_HOME:-$HOME/.local/state}/Herdr/shepherd-audit"
   [ "$state_dir" = "$expected" ] || { echo "Refusing to purge unexpected path: $state_dir" >&2; exit 1; }
   rm -rf "$state_dir"
 fi
 
-echo "Removed Herdr coordination hooks."
+echo "Removed Herdr Shepherd hooks."
 [ "$purge_audit_history" -eq 0 ] && echo "Preserved audit history at $state_dir"

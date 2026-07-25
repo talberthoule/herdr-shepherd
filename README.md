@@ -1,8 +1,8 @@
-# Herdr Agent Coordination
+# Herdr Shepherd
 
 Multiple agents can move faster than one agent, but only when they can see who owns each lane. Without that shared context, parallel work turns into duplicate edits, stale plans, hidden terminal state, and risky Git moves.
 
-Herdr Agent Coordination is a Codex and Claude Code plugin for using Herdr as shared working context. It gives each session a local protocol for discovering active work, avoiding duplicate edits, choosing between inline work, helper subagents, and visible Herdr lanes, sending source-attributed handoffs, and reviewing a token-protected activity trail.
+Herdr Shepherd is a Codex and Claude Code plugin for using Herdr as shared working context. It gives each session a local protocol for discovering active work, avoiding duplicate edits, choosing between inline work, helper subagents, and visible Herdr lanes, sending source-attributed handoffs, and reviewing a token-protected activity trail.
 
 It is deliberately small: Herdr remains the coordination layer, and this project adds skill instructions plus audited hooks around the Herdr CLI.
 
@@ -21,22 +21,22 @@ The normal setup is two commands in the host CLI you already use.
 Codex:
 
 ```sh
-codex plugin marketplace add talberthoule/coordinating-herdr-agents
-codex plugin add coordinating-herdr-agents@herdr
+codex plugin marketplace add talberthoule/herdr-shepherd
+codex plugin add herdr-shepherd@shepherd
 ```
 
 Claude Code:
 
 ```sh
-claude plugin marketplace add talberthoule/coordinating-herdr-agents
-claude plugin install coordinating-herdr-agents@herdr
+claude plugin marketplace add talberthoule/herdr-shepherd
+claude plugin install herdr-shepherd@shepherd
 ```
 
 Review and trust the installed hooks through the normal host prompt. The hooks are what block raw Herdr mutations and record audited coordination actions.
 
 ## First Use
 
-Start a new agent session and ask it to use Herdr Agent Coordination before editing a shared repository. The skill will inspect Herdr first, read relevant panes, and only send an audited message when another session owns overlapping work or has context worth preserving.
+Start a new agent session and ask it to use Herdr Shepherd before editing a shared repository. The skill will inspect Herdr first, read relevant panes, and only send an audited message when another session owns overlapping work or has context worth preserving.
 
 It also helps decide when to keep work inline, when a short-lived subagent is enough, and when to branch into another visible Herdr lane for durable parallel work. That lets teams add processing power without losing ownership, context, or merge safety.
 
@@ -80,16 +80,16 @@ Manual install is useful when plugin marketplaces are unavailable or when testin
 Windows:
 
 ```powershell
-git clone https://github.com/talberthoule/coordinating-herdr-agents.git
-cd coordinating-herdr-agents
+git clone https://github.com/talberthoule/herdr-shepherd.git
+cd herdr-shepherd
 ./install.ps1
 ```
 
 Linux:
 
 ```sh
-git clone https://github.com/talberthoule/coordinating-herdr-agents.git
-cd coordinating-herdr-agents
+git clone https://github.com/talberthoule/herdr-shepherd.git
+cd herdr-shepherd
 ./install.sh
 ```
 

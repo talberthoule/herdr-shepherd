@@ -24,7 +24,7 @@ async function main() {
 
 if (process.argv[1] && basename(process.argv[1]) === basename(fileURLToPath(import.meta.url))) {
   main().catch((error) => {
-    process.stderr.write(`Herdr coordination hook failed: ${error.message}\n`);
+    process.stderr.write(`Herdr Shepherd hook failed: ${error.message}\n`);
     process.exitCode = 1;
   });
 }

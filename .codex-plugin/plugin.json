@@ -1,29 +1,29 @@
 {
-  "name": "coordinating-herdr-agents",
+  "name": "herdr-shepherd",
   "version": "0.1.0",
-  "description": "Coordinate Codex and Claude Code sessions through Herdr with audited handoffs and a local activity trail.",
+  "description": "Herdr Shepherd coordinates Codex and Claude Code sessions through Herdr with audited handoffs and a local activity trail.",
   "author": {
     "name": "Talbert Houle",
     "url": "https://github.com/talberthoule"
   },
-  "homepage": "https://github.com/talberthoule/coordinating-herdr-agents",
-  "repository": "https://github.com/talberthoule/coordinating-herdr-agents",
+  "homepage": "https://github.com/talberthoule/herdr-shepherd",
+  "repository": "https://github.com/talberthoule/herdr-shepherd",
   "license": "MIT",
   "keywords": ["herdr", "codex", "claude-code", "coordination", "agents"],
   "skills": "./skills/",
   "hooks": "./hooks/hooks.json",
   "interface": {
-    "displayName": "Herdr Agent Coordination",
-    "shortDescription": "Audited Herdr coordination for parallel agent work",
-    "longDescription": "Discover active work, avoid duplicate sessions, send source-attributed handoffs, and inspect local coordination events while keeping Herdr as the coordination layer.",
+    "displayName": "Herdr Shepherd",
+    "shortDescription": "Audited Herdr Shepherd coordination for parallel agent work",
+    "longDescription": "Herdr Shepherd discovers active work, avoids duplicate sessions, sends source-attributed handoffs, and inspects local coordination events while keeping Herdr as the coordination layer.",
     "developerName": "Talbert Houle",
     "category": "Developer Tools",
     "capabilities": ["Instructions", "Lifecycle hooks"],
-    "websiteURL": "https://github.com/talberthoule/coordinating-herdr-agents",
+    "websiteURL": "https://github.com/talberthoule/herdr-shepherd",
     "defaultPrompt": [
-      "Use Herdr Agent Coordination before editing in this shared worktree.",
-      "Inspect active Herdr agents and coordinate any overlapping work.",
-      "Send an audited Herdr handoff to the agent that owns this work."
+      "Use Herdr Shepherd before editing in this shared worktree.",
+      "Use $herdr-shepherd to inspect active Herdr agents and coordinate overlapping work.",
+      "Send an audited Herdr Shepherd handoff to the agent that owns this work."
     ],
     "brandColor": "#111827"
   }

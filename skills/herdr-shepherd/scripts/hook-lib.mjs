@@ -58,10 +58,10 @@ function defaultOpenUrl(url) {
   const args = process.platform === 'win32' ? ['/d', '/c', 'start', '/min', '', url] : process.platform === 'darwin' ? ['-g', url] : [url];
   try {
     const browser = spawn(command, args, { detached: true, stdio: 'ignore', windowsHide: true });
-    browser.once('error', () => process.stderr.write(`Herdr coordination audit: ${url}\n`));
+    browser.once('error', () => process.stderr.write(`Herdr Shepherd audit: ${url}\n`));
     browser.unref();
   } catch {
-    process.stderr.write(`Herdr coordination audit: ${url}\n`);
+    process.stderr.write(`Herdr Shepherd audit: ${url}\n`);
   }
 }
 
@@ -105,7 +105,7 @@ export async function ensureAuditViewer(stateDir = defaultStateDir(), options = 
         const serverPath = fileURLToPath(new URL('./audit-server.mjs', import.meta.url));
         const child = spawn(process.execPath, [serverPath], {
           detached: true, stdio: 'ignore', windowsHide: true,
-          env: { ...process.env, HERDR_COORDINATION_STATE_DIR: stateDir, HERDR_COORDINATION_VIEWER_TOKEN: token },
+          env: { ...process.env, HERDR_SHEPHERD_STATE_DIR: stateDir, HERDR_COORDINATION_VIEWER_TOKEN: token },
         });
         child.unref();
         const deadline = Date.now() + 5000;
@@ -126,7 +126,7 @@ export async function ensureAuditViewer(stateDir = defaultStateDir(), options = 
     try {
       await openUrl(url);
     } catch {
-      process.stderr.write(`Herdr coordination audit: ${url}\n`);
+      process.stderr.write(`Herdr Shepherd audit: ${url}\n`);
     }
   }
   return url;
@@ -140,7 +140,7 @@ export async function handleHookPayload(payload, options = {}) {
   const classification = classifyShellCommand(command);
   if (classification.kind === 'other' || classification.kind === 'read') return {};
   if (eventName === 'PreToolUse' && classification.kind === 'raw-mutation') {
-    return { output: deny('Raw Herdr mutations are blocked. Use the coordinating-herdr-agents audited wrapper.') };
+    return { output: deny('Raw Herdr mutations are blocked. Use the herdr-shepherd audited wrapper.') };
   }
   if (classification.kind !== 'wrapper') return {};
 

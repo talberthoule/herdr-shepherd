@@ -1,6 +1,6 @@
 # Agent Guidance
 
-This file mirrors the Stacking Work Across Lanes, Merge Train Coordination, Coordination Transport Reliability, Routing Substance and Pointers, and Durable Record Setup workflows from [skills/coordinating-herdr-agents/SKILL.md](skills/coordinating-herdr-agents/SKILL.md) so they are visible to any agent working in this repository. Keep AGENTS.md, CLAUDE.md, and SKILL.md in sync when editing them.
+This file mirrors the Stacking Work Across Lanes, Merge Train Coordination, Coordination Transport Reliability, Routing Substance and Pointers, and Durable Record Setup workflows from [skills/herdr-shepherd/SKILL.md](skills/herdr-shepherd/SKILL.md) so they are visible to any agent working in this repository. Keep AGENTS.md, CLAUDE.md, and SKILL.md in sync when editing them.
 
 ## Stacking Work Across Lanes
 

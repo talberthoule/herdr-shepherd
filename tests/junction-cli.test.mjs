@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
-const skillRoot = join(root, 'skills', 'coordinating-herdr-agents');
+const skillRoot = join(root, 'skills', 'herdr-shepherd');
 
 function run(command, args, input) {
   return new Promise((resolve, reject) => {
@@ -25,7 +25,7 @@ function run(command, args, input) {
 test('hook CLI executes when invoked through a Claude-style junction', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'herdr-junction-'));
   const skills = join(dir, 'skills');
-  const link = join(skills, 'coordinating-herdr-agents');
+  const link = join(skills, 'herdr-shepherd');
   await mkdir(skills);
   await symlink(skillRoot, link, 'junction');
   const payload = JSON.stringify({

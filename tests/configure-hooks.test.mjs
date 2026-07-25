@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
 
-import { installHooks, uninstallHooks } from '../skills/coordinating-herdr-agents/scripts/configure-hooks.mjs';
+import { installHooks, uninstallHooks } from '../skills/herdr-shepherd/scripts/configure-hooks.mjs';
 
 test('installation preserves existing hooks and is idempotent for both runtimes', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'herdr-hooks-'));

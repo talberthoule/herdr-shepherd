@@ -5,11 +5,11 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 
-import { executeCoordinationRequest } from '../skills/coordinating-herdr-agents/scripts/coordinate.mjs';
+import { executeCoordinationRequest } from '../skills/herdr-shepherd/scripts/coordinate.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const fakeHerdr = join(here, 'fake-herdr.mjs');
-const skillPath = join(here, '..', 'skills', 'coordinating-herdr-agents', 'SKILL.md');
+const skillPath = join(here, '..', 'skills', 'herdr-shepherd', 'SKILL.md');
 
 function request(overrides) {
   const value = {

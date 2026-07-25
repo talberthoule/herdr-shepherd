@@ -5,6 +5,7 @@ import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
+const skillRoot = 'skills/herdr-shepherd';
 
 test('public repository contains both plugin manifests and one canonical skill runtime', async () => {
   for (const path of [
@@ -14,11 +15,11 @@ test('public repository contains both plugin manifests and one canonical skill r
     '.claude-plugin/marketplace.json',
     'hooks/hooks.json',
     'hooks/claude.json',
-    'skills/coordinating-herdr-agents/SKILL.md',
-    'skills/coordinating-herdr-agents/agents/openai.yaml',
-    'skills/coordinating-herdr-agents/references/command-policy.md',
-    'skills/coordinating-herdr-agents/scripts/hook.mjs',
-    'skills/coordinating-herdr-agents/scripts/coordinate.mjs',
+    `${skillRoot}/SKILL.md`,
+    `${skillRoot}/agents/openai.yaml`,
+    `${skillRoot}/references/command-policy.md`,
+    `${skillRoot}/scripts/hook.mjs`,
+    `${skillRoot}/scripts/coordinate.mjs`,
     'install.ps1',
     'install.sh',
     'uninstall.ps1',
@@ -31,24 +32,24 @@ test('public repository contains both plugin manifests and one canonical skill r
   await assert.rejects(readFile(join(root, 'scripts', 'hook.mjs')), /ENOENT/);
 });
 
-test('marketplace manifests expose the herdr plugin id', async () => {
+test('marketplace manifests expose the herdr-shepherd plugin id', async () => {
   const codexPlugin = JSON.parse(await readFile(join(root, '.codex-plugin/plugin.json'), 'utf8'));
   const claudePlugin = JSON.parse(await readFile(join(root, '.claude-plugin/plugin.json'), 'utf8'));
   const codexMarket = JSON.parse(await readFile(join(root, '.agents/plugins/marketplace.json'), 'utf8'));
   const claudeMarket = JSON.parse(await readFile(join(root, '.claude-plugin/marketplace.json'), 'utf8'));
-  assert.equal(codexPlugin.name, 'coordinating-herdr-agents');
-  assert.equal(claudePlugin.name, 'coordinating-herdr-agents');
-  assert.equal(codexMarket.name, 'herdr');
-  assert.equal(claudeMarket.name, 'herdr');
-  assert.equal(codexMarket.plugins[0].name, 'coordinating-herdr-agents');
-  assert.equal(claudeMarket.plugins[0].name, 'coordinating-herdr-agents');
+  assert.equal(codexPlugin.name, 'herdr-shepherd');
+  assert.equal(claudePlugin.name, 'herdr-shepherd');
+  assert.equal(codexMarket.name, 'shepherd');
+  assert.equal(claudeMarket.name, 'shepherd');
+  assert.equal(codexMarket.plugins[0].name, 'herdr-shepherd');
+  assert.equal(claudeMarket.plugins[0].name, 'herdr-shepherd');
 });
 
 test('root Windows installers resolve the canonical skill runtime', async () => {
   const install = await readFile(join(root, 'install.ps1'), 'utf8');
   const uninstall = await readFile(join(root, 'uninstall.ps1'), 'utf8');
-  assert.match(install, /skills\\coordinating-herdr-agents/);
-  assert.match(uninstall, /skills\\coordinating-herdr-agents/);
+  assert.match(install, /skills\\herdr-shepherd/);
+  assert.match(uninstall, /skills\\herdr-shepherd/);
   assert.match(install, /scripts\\configure-hooks\.mjs/);
   assert.match(uninstall, /scripts\\configure-hooks\.mjs/);
 });
@@ -56,10 +57,10 @@ test('root Windows installers resolve the canonical skill runtime', async () => 
 test('README leads with plugin setup and common coordination workflows', async () => {
   const readme = await readFile(join(root, 'README.md'), 'utf8');
   const required = [
-    'codex plugin marketplace add talberthoule/coordinating-herdr-agents',
-    'codex plugin add coordinating-herdr-agents@herdr',
-    'claude plugin marketplace add talberthoule/coordinating-herdr-agents',
-    'claude plugin install coordinating-herdr-agents@herdr',
+    'codex plugin marketplace add talberthoule/herdr-shepherd',
+    'codex plugin add herdr-shepherd@shepherd',
+    'claude plugin marketplace add talberthoule/herdr-shepherd',
+    'claude plugin install herdr-shepherd@shepherd',
     './install.ps1',
     './install.sh',
     'discover active and paused work',

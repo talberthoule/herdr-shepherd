@@ -6,10 +6,10 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"${CLAUDE_PLUGIN_ROOT}/skills/coordinating-herdr-agents/scripts/hook.mjs\"",
-            "commandWindows": "if (Get-Command node -ErrorAction SilentlyContinue) { node \"$env:CLAUDE_PLUGIN_ROOT\\skills\\coordinating-herdr-agents\\scripts\\hook.mjs\" }",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/skills/herdr-shepherd/scripts/hook.mjs\"",
+            "commandWindows": "if (Get-Command node -ErrorAction SilentlyContinue) { node \"$env:CLAUDE_PLUGIN_ROOT\\skills\\herdr-shepherd\\scripts\\hook.mjs\" }",
             "timeout": 15,
-            "statusMessage": "Auditing Herdr coordination..."
+            "statusMessage": "Auditing Herdr Shepherd coordination..."
           }
         ]
       }
@@ -20,10 +20,10 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"${CLAUDE_PLUGIN_ROOT}/skills/coordinating-herdr-agents/scripts/hook.mjs\"",
-            "commandWindows": "if (Get-Command node -ErrorAction SilentlyContinue) { node \"$env:CLAUDE_PLUGIN_ROOT\\skills\\coordinating-herdr-agents\\scripts\\hook.mjs\" }",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/skills/herdr-shepherd/scripts/hook.mjs\"",
+            "commandWindows": "if (Get-Command node -ErrorAction SilentlyContinue) { node \"$env:CLAUDE_PLUGIN_ROOT\\skills\\herdr-shepherd\\scripts\\hook.mjs\" }",
             "timeout": 15,
-            "statusMessage": "Recording Herdr coordination..."
+            "statusMessage": "Recording Herdr Shepherd coordination..."
           }
         ]
       }

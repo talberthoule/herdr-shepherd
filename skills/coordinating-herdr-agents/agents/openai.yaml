@@ -1,4 +1,0 @@
-interface:
-  display_name: "Herdr Agent Coordination"
-  short_description: "Coordinate work across Herdr tabs and agents"
-  default_prompt: "Use $coordinating-herdr-agents to recover and coordinate work across Herdr tabs."
