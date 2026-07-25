@@ -1,15 +1,15 @@
 {
   "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
-  "name": "herdr",
-  "description": "Herdr coordination plugins for Codex and Claude Code agents.",
+  "name": "shepherd",
+  "description": "Herdr Shepherd coordination plugins for Codex and Claude Code agents.",
   "owner": {
     "name": "Talbert Houle",
     "url": "https://github.com/talberthoule"
   },
   "plugins": [
     {
-      "name": "coordinating-herdr-agents",
-      "description": "Audited Herdr coordination for parallel Codex and Claude Code sessions.",
+      "name": "herdr-shepherd",
+      "description": "Herdr Shepherd coordinates parallel Codex and Claude Code sessions.",
       "source": "./",
       "category": "productivity"
     }

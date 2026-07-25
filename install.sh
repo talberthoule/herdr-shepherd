@@ -2,12 +2,12 @@
 set -eu
 
 repo_root=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
-skill_root="$repo_root/skills/coordinating-herdr-agents"
+skill_root="$repo_root/skills/herdr-shepherd"
 codex_home="${CODEX_HOME:-$HOME/.codex}"
 claude_home="$HOME/.claude"
 codex_hooks="$codex_home/hooks.json"
 claude_settings="$claude_home/settings.json"
-claude_link="$claude_home/skills/coordinating-herdr-agents"
+claude_link="$claude_home/skills/herdr-shepherd"
 state_dir="${XDG_STATE_HOME:-$HOME/.local/state}/Herdr/coordination-audit"
 
 command -v node >/dev/null 2>&1 || { echo "Required command is not available on PATH: node" >&2; exit 1; }
@@ -46,6 +46,6 @@ if [ "$codex_installed" -eq 1 ] && { [ ! -f "$codex_home/config.toml" ] || ! gre
   echo "Warning: Codex hooks are not enabled in config.toml. Add hooks = true under [features]." >&2
 fi
 
-echo "Installed coordinating-herdr-agents."
+echo "Installed herdr-shepherd."
 echo "Shared audit state: $state_dir"
 echo "Review and trust the new hooks in a fresh host session."

@@ -1,9 +1,9 @@
 ---
-name: coordinating-herdr-agents
+name: herdr-shepherd
 description: Use when a user references Herdr spaces, workspaces, tabs, panes, agents, paused work, handoffs, or duplicate effort; or when unexplained Git state suggests parallel work, such as an unexpected branch or HEAD, unfamiliar dirty files, files changing during inspection, a shared worktree, or another active tool or agent.
 ---
 
-# Coordinating Herdr Agents
+# Herdr Shepherd
 
 ## Overview
 
@@ -196,13 +196,13 @@ After snapshot and pane-read show that `w2:p1` owns a paused installer build, ru
 ```powershell
 @'
 {"origin":"proactive","action":"herdr.exec","args":["agent","send","w2:p1","Resume the official installer build and report blockers here."],"target":{"type":"agent","id":"w2:p1"},"reason":"Continue paused work without duplicating it","message":"Resume the official installer build and report blockers here."}
-'@ | node "$HOME\.codex\skills\coordinating-herdr-agents\scripts\coordinate.mjs" --stdin
+'@ | node "$HOME\.codex\skills\herdr-shepherd\scripts\coordinate.mjs" --stdin
 ```
 
 On Linux, use the same literal JSON through a quoted heredoc:
 
 ```sh
-node "$HOME/.codex/skills/coordinating-herdr-agents/scripts/coordinate.mjs" --stdin <<'JSON'
+node "$HOME/.codex/skills/herdr-shepherd/scripts/coordinate.mjs" --stdin <<'JSON'
 {"origin":"proactive","action":"herdr.exec","args":["agent","send","w2:p1","Resume the official installer build and report blockers here."],"target":{"type":"agent","id":"w2:p1"},"reason":"Continue paused work without duplicating it","message":"Resume the official installer build and report blockers here."}
 JSON
 ```

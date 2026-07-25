@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 
 const here = dirname(fileURLToPath(import.meta.url));
-const skillPath = join(here, '..', 'skills', 'coordinating-herdr-agents', 'SKILL.md');
+const skillPath = join(here, '..', 'skills', 'herdr-shepherd', 'SKILL.md');
 
 const heading = '## Herdr Instance vs Subagent';
 

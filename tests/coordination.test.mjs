@@ -14,7 +14,7 @@ import {
   listAuditEvents,
   redactOutboundText,
   validateCoordinationRequest,
-} from '../skills/coordinating-herdr-agents/scripts/core.mjs';
+} from '../skills/herdr-shepherd/scripts/core.mjs';
 
 async function stateDir() {
   return mkdtemp(join(tmpdir(), 'herdr-coordination-'));

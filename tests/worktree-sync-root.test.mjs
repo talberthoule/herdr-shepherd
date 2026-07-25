@@ -6,7 +6,7 @@ import test from 'node:test';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, '..');
-const skillPath = join(root, 'skills', 'coordinating-herdr-agents', 'SKILL.md');
+const skillPath = join(root, 'skills', 'herdr-shepherd', 'SKILL.md');
 
 const heading = '## Shared Git Working Trees';
 

@@ -2,22 +2,22 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Ship Herdr Agent Coordination as a native Codex and Claude Code plugin marketplace with Windows and Linux manual installers, a single reusable runtime, and an activity viewer that reuses one page, shows newest events first, and supports deletion.
+**Goal:** Ship Herdr Shepherd as a native Codex and Claude Code plugin marketplace with Windows and Linux manual installers, a single reusable runtime, and an activity viewer that reuses one page, shows newest events first, and supports deletion.
 
-**Architecture:** Move the existing skill and Node runtime into `skills/coordinating-herdr-agents/` and point both plugin manifests, hook manifests, tests, and manual installers at that one copy. Keep the activity viewer in the existing `audit-server.mjs`, `hook-lib.mjs`, and `core.mjs` modules; add only the smallest persistence and API functions needed for page-presence tracking and audit deletion.
+**Architecture:** Move the existing skill and Node runtime into `skills/herdr-shepherd/` and point both plugin manifests, hook manifests, tests, and manual installers at that one copy. Keep the activity viewer in the existing `audit-server.mjs`, `hook-lib.mjs`, and `core.mjs` modules; add only the smallest persistence and API functions needed for page-presence tracking and audit deletion.
 
 **Tech Stack:** Node.js ESM standard library, `node:test`, PowerShell, POSIX `/bin/sh`, Codex plugin manifest, Claude Code plugin manifest, Herdr CLI.
 
 ## Global Constraints
 
-- Marketplace name is `herdr`.
-- Codex install commands are `codex plugin marketplace add talberthoule/coordinating-herdr-agents` and `codex plugin add coordinating-herdr-agents@herdr`.
-- Claude Code install commands are `claude plugin marketplace add talberthoule/coordinating-herdr-agents` and `claude plugin install coordinating-herdr-agents@herdr`.
+- Marketplace name is `shepherd`.
+- Codex install commands are `codex plugin marketplace add talberthoule/herdr-shepherd` and `codex plugin add herdr-shepherd@shepherd`.
+- Claude Code install commands are `claude plugin marketplace add talberthoule/herdr-shepherd` and `claude plugin install herdr-shepherd@shepherd`.
 - Both plugins contain the skill and hooks; users still review and trust hooks through the host's normal security flow.
 - Windows manual fallback is clone plus `./install.ps1`.
 - Linux manual fallback is clone plus `./install.sh`.
 - No package registry, daemon, dependency framework, or duplicated Codex/Claude runtime is introduced.
-- Existing skill/runtime files move into `skills/coordinating-herdr-agents/`; do not leave a second implementation under root `scripts/`.
+- Existing skill/runtime files move into `skills/herdr-shepherd/`; do not leave a second implementation under root `scripts/`.
 - Node and Herdr are required.
 - Manual installers configure whichever supported hosts are present and fail only when neither Codex nor Claude Code is installed.
 - PowerShell here-strings and literal POSIX heredocs are both accepted by the audited wrapper parser.
@@ -28,10 +28,10 @@
 
 ## File Structure
 
-- Move `SKILL.md` to `skills/coordinating-herdr-agents/SKILL.md`: canonical skill instructions.
-- Move `agents/openai.yaml` to `skills/coordinating-herdr-agents/agents/openai.yaml`: default agent metadata.
-- Move `references/command-policy.md` to `skills/coordinating-herdr-agents/references/command-policy.md`: audited command policy reference.
-- Move `scripts/*.mjs` to `skills/coordinating-herdr-agents/scripts/*.mjs`: the single Node runtime.
+- Move `SKILL.md` to `skills/herdr-shepherd/SKILL.md`: canonical skill instructions.
+- Move `agents/openai.yaml` to `skills/herdr-shepherd/agents/openai.yaml`: default agent metadata.
+- Move `references/command-policy.md` to `skills/herdr-shepherd/references/command-policy.md`: audited command policy reference.
+- Move `scripts/*.mjs` to `skills/herdr-shepherd/scripts/*.mjs`: the single Node runtime.
 - Move `scripts/install.ps1` to `install.ps1`: Windows manual installer.
 - Move `scripts/uninstall.ps1` to `uninstall.ps1`: Windows manual uninstaller.
 - Create `install.sh`: POSIX manual installer.
@@ -49,15 +49,15 @@
 ## Task 1: Canonical Plugin Layout and Marketplace Metadata
 
 **Files:**
-- Move: `SKILL.md` -> `skills/coordinating-herdr-agents/SKILL.md`
-- Move: `agents/openai.yaml` -> `skills/coordinating-herdr-agents/agents/openai.yaml`
-- Move: `references/command-policy.md` -> `skills/coordinating-herdr-agents/references/command-policy.md`
-- Move: `scripts/core.mjs` -> `skills/coordinating-herdr-agents/scripts/core.mjs`
-- Move: `scripts/coordinate.mjs` -> `skills/coordinating-herdr-agents/scripts/coordinate.mjs`
-- Move: `scripts/configure-hooks.mjs` -> `skills/coordinating-herdr-agents/scripts/configure-hooks.mjs`
-- Move: `scripts/audit-server.mjs` -> `skills/coordinating-herdr-agents/scripts/audit-server.mjs`
-- Move: `scripts/hook-lib.mjs` -> `skills/coordinating-herdr-agents/scripts/hook-lib.mjs`
-- Move: `scripts/hook.mjs` -> `skills/coordinating-herdr-agents/scripts/hook.mjs`
+- Move: `SKILL.md` -> `skills/herdr-shepherd/SKILL.md`
+- Move: `agents/openai.yaml` -> `skills/herdr-shepherd/agents/openai.yaml`
+- Move: `references/command-policy.md` -> `skills/herdr-shepherd/references/command-policy.md`
+- Move: `scripts/core.mjs` -> `skills/herdr-shepherd/scripts/core.mjs`
+- Move: `scripts/coordinate.mjs` -> `skills/herdr-shepherd/scripts/coordinate.mjs`
+- Move: `scripts/configure-hooks.mjs` -> `skills/herdr-shepherd/scripts/configure-hooks.mjs`
+- Move: `scripts/audit-server.mjs` -> `skills/herdr-shepherd/scripts/audit-server.mjs`
+- Move: `scripts/hook-lib.mjs` -> `skills/herdr-shepherd/scripts/hook-lib.mjs`
+- Move: `scripts/hook.mjs` -> `skills/herdr-shepherd/scripts/hook.mjs`
 - Move: `scripts/install.ps1` -> `install.ps1`
 - Move: `scripts/uninstall.ps1` -> `uninstall.ps1`
 - Create: `.codex-plugin/plugin.json`
@@ -70,10 +70,10 @@
 - Modify: `tests/*.test.mjs`
 
 **Interfaces:**
-- Produces: canonical skill root `skills/coordinating-herdr-agents`.
-- Produces: canonical runtime path `skills/coordinating-herdr-agents/scripts/hook.mjs`.
-- Produces: hook command `node "${CLAUDE_PLUGIN_ROOT}/skills/coordinating-herdr-agents/scripts/hook.mjs"`.
-- Produces: installable marketplace id `coordinating-herdr-agents@herdr`.
+- Produces: canonical skill root `skills/herdr-shepherd`.
+- Produces: canonical runtime path `skills/herdr-shepherd/scripts/hook.mjs`.
+- Produces: hook command `node "${CLAUDE_PLUGIN_ROOT}/skills/herdr-shepherd/scripts/hook.mjs"`.
+- Produces: installable marketplace id `herdr-shepherd@shepherd`.
 
 - [ ] **Step 1: Write the failing public layout test**
 
@@ -88,11 +88,11 @@ test('public repository contains both plugin manifests and one canonical skill r
     '.claude-plugin/marketplace.json',
     'hooks/hooks.json',
     'hooks/claude.json',
-    'skills/coordinating-herdr-agents/SKILL.md',
-    'skills/coordinating-herdr-agents/agents/openai.yaml',
-    'skills/coordinating-herdr-agents/references/command-policy.md',
-    'skills/coordinating-herdr-agents/scripts/hook.mjs',
-    'skills/coordinating-herdr-agents/scripts/coordinate.mjs',
+    'skills/herdr-shepherd/SKILL.md',
+    'skills/herdr-shepherd/agents/openai.yaml',
+    'skills/herdr-shepherd/references/command-policy.md',
+    'skills/herdr-shepherd/scripts/hook.mjs',
+    'skills/herdr-shepherd/scripts/coordinate.mjs',
     'install.ps1',
     'install.sh',
     'uninstall.ps1',
@@ -114,12 +114,12 @@ test('marketplace manifests expose the herdr plugin id', async () => {
   const claudePlugin = JSON.parse(await readFile(join(root, '.claude-plugin/plugin.json'), 'utf8'));
   const codexMarket = JSON.parse(await readFile(join(root, '.agents/plugins/marketplace.json'), 'utf8'));
   const claudeMarket = JSON.parse(await readFile(join(root, '.claude-plugin/marketplace.json'), 'utf8'));
-  assert.equal(codexPlugin.name, 'coordinating-herdr-agents');
-  assert.equal(claudePlugin.name, 'coordinating-herdr-agents');
+  assert.equal(codexPlugin.name, 'herdr-shepherd');
+  assert.equal(claudePlugin.name, 'herdr-shepherd');
   assert.equal(codexMarket.name, 'herdr');
   assert.equal(claudeMarket.name, 'herdr');
-  assert.equal(codexMarket.plugins[0].name, 'coordinating-herdr-agents');
-  assert.equal(claudeMarket.plugins[0].name, 'coordinating-herdr-agents');
+  assert.equal(codexMarket.plugins[0].name, 'herdr-shepherd');
+  assert.equal(claudeMarket.plugins[0].name, 'herdr-shepherd');
 });
 ```
 
@@ -151,20 +151,20 @@ Run:
 node --test --test-concurrency=1 tests/public-release.test.mjs
 ```
 
-Expected: FAIL because `.codex-plugin/plugin.json`, `.claude-plugin/plugin.json`, `skills/coordinating-herdr-agents/SKILL.md`, and `install.sh` do not exist yet.
+Expected: FAIL because `.codex-plugin/plugin.json`, `.claude-plugin/plugin.json`, `skills/herdr-shepherd/SKILL.md`, and `install.sh` do not exist yet.
 
 - [ ] **Step 3: Move the existing files into the canonical layout**
 
 Run:
 
 ```powershell
-New-Item -ItemType Directory -Force -Path 'skills\coordinating-herdr-agents' | Out-Null
-git mv SKILL.md skills/coordinating-herdr-agents/SKILL.md
-git mv agents skills/coordinating-herdr-agents/agents
-git mv references skills/coordinating-herdr-agents/references
-git mv scripts skills/coordinating-herdr-agents/scripts
-git mv skills/coordinating-herdr-agents/scripts/install.ps1 install.ps1
-git mv skills/coordinating-herdr-agents/scripts/uninstall.ps1 uninstall.ps1
+New-Item -ItemType Directory -Force -Path 'skills\herdr-shepherd' | Out-Null
+git mv SKILL.md skills/herdr-shepherd/SKILL.md
+git mv agents skills/herdr-shepherd/agents
+git mv references skills/herdr-shepherd/references
+git mv scripts skills/herdr-shepherd/scripts
+git mv skills/herdr-shepherd/scripts/install.ps1 install.ps1
+git mv skills/herdr-shepherd/scripts/uninstall.ps1 uninstall.ps1
 ```
 
 Update imports in tests from:
@@ -176,7 +176,7 @@ import { appendAuditEvent } from '../scripts/core.mjs';
 to the matching canonical path:
 
 ```js
-import { appendAuditEvent } from '../skills/coordinating-herdr-agents/scripts/core.mjs';
+import { appendAuditEvent } from '../skills/herdr-shepherd/scripts/core.mjs';
 ```
 
 Apply that import-prefix change to every test importing from `../scripts/`.
@@ -185,7 +185,7 @@ In `tests/junction-cli.test.mjs`, replace the current `skillRoot` line with:
 
 ```js
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
-const skillRoot = join(root, 'skills', 'coordinating-herdr-agents');
+const skillRoot = join(root, 'skills', 'herdr-shepherd');
 ```
 
 - [ ] **Step 4: Add plugin and marketplace manifests**
@@ -194,31 +194,31 @@ Create `.codex-plugin/plugin.json`:
 
 ```json
 {
-  "name": "coordinating-herdr-agents",
+  "name": "herdr-shepherd",
   "version": "0.1.0",
-  "description": "Coordinate Codex and Claude Code sessions through Herdr with audited handoffs and a local activity trail.",
+  "description": "Herdr Shepherd coordinates Codex and Claude Code sessions through Herdr with audited handoffs and a local activity trail.",
   "author": {
     "name": "Talbert Houle",
     "url": "https://github.com/talberthoule"
   },
-  "homepage": "https://github.com/talberthoule/coordinating-herdr-agents",
-  "repository": "https://github.com/talberthoule/coordinating-herdr-agents",
+  "homepage": "https://github.com/talberthoule/herdr-shepherd",
+  "repository": "https://github.com/talberthoule/herdr-shepherd",
   "license": "MIT",
   "keywords": ["herdr", "codex", "claude-code", "coordination", "agents"],
   "skills": "./skills/",
   "hooks": "./hooks/hooks.json",
   "interface": {
-    "displayName": "Herdr Agent Coordination",
-    "shortDescription": "Audited Herdr coordination for parallel agent work",
-    "longDescription": "Discover active work, avoid duplicate sessions, send source-attributed handoffs, and inspect local coordination events while keeping Herdr as the coordination layer.",
+    "displayName": "Herdr Shepherd",
+    "shortDescription": "Audited Herdr Shepherd coordination for parallel agent work",
+    "longDescription": "Herdr Shepherd discovers active work, avoids duplicate sessions, sends source-attributed handoffs, and inspects local coordination events while keeping Herdr as the coordination layer.",
     "developerName": "Talbert Houle",
     "category": "Developer Tools",
     "capabilities": ["Instructions", "Lifecycle hooks"],
-    "websiteURL": "https://github.com/talberthoule/coordinating-herdr-agents",
+    "websiteURL": "https://github.com/talberthoule/herdr-shepherd",
     "defaultPrompt": [
-      "Use Herdr Agent Coordination before editing in this shared worktree.",
-      "Inspect active Herdr agents and coordinate any overlapping work.",
-      "Send an audited Herdr handoff to the agent that owns this work."
+      "Use Herdr Shepherd before editing in this shared worktree.",
+      "Use $herdr-shepherd to inspect active Herdr agents and coordinate overlapping work.",
+      "Send an audited Herdr Shepherd handoff to the agent that owns this work."
     ],
     "brandColor": "#111827"
   }
@@ -229,9 +229,9 @@ Create `.claude-plugin/plugin.json`:
 
 ```json
 {
-  "name": "coordinating-herdr-agents",
+  "name": "herdr-shepherd",
   "version": "0.1.0",
-  "description": "Coordinate Codex and Claude Code sessions through Herdr with audited handoffs and a local activity trail.",
+  "description": "Herdr Shepherd coordinates Codex and Claude Code sessions through Herdr with audited handoffs and a local activity trail.",
   "author": {
     "name": "Talbert Houle",
     "url": "https://github.com/talberthoule"
@@ -244,16 +244,16 @@ Create `.agents/plugins/marketplace.json`:
 
 ```json
 {
-  "name": "herdr",
+  "name": "shepherd",
   "interface": {
-    "displayName": "Herdr"
+    "displayName": "Shepherd"
   },
   "plugins": [
     {
-      "name": "coordinating-herdr-agents",
+      "name": "herdr-shepherd",
       "source": {
         "source": "url",
-        "url": "https://github.com/talberthoule/coordinating-herdr-agents.git",
+        "url": "https://github.com/talberthoule/herdr-shepherd.git",
         "ref": "main"
       },
       "policy": {
@@ -271,16 +271,16 @@ Create `.claude-plugin/marketplace.json`:
 ```json
 {
   "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
-  "name": "herdr",
-  "description": "Herdr coordination plugins for Codex and Claude Code agents.",
+  "name": "shepherd",
+  "description": "Herdr Shepherd coordination plugins for Codex and Claude Code agents.",
   "owner": {
     "name": "Talbert Houle",
     "url": "https://github.com/talberthoule"
   },
   "plugins": [
     {
-      "name": "coordinating-herdr-agents",
-      "description": "Audited Herdr coordination for parallel Codex and Claude Code sessions.",
+      "name": "herdr-shepherd",
+      "description": "Herdr Shepherd coordinates parallel Codex and Claude Code sessions.",
       "source": "./",
       "category": "productivity"
     }
@@ -301,8 +301,8 @@ Create `hooks/hooks.json`:
         "hooks": [
           {
             "type": "command",
-            "command": "node \"${CLAUDE_PLUGIN_ROOT}/skills/coordinating-herdr-agents/scripts/hook.mjs\"",
-            "commandWindows": "if (Get-Command node -ErrorAction SilentlyContinue) { node \"$env:CLAUDE_PLUGIN_ROOT\\skills\\coordinating-herdr-agents\\scripts\\hook.mjs\" }",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/skills/herdr-shepherd/scripts/hook.mjs\"",
+            "commandWindows": "if (Get-Command node -ErrorAction SilentlyContinue) { node \"$env:CLAUDE_PLUGIN_ROOT\\skills\\herdr-shepherd\\scripts\\hook.mjs\" }",
             "timeout": 15,
             "statusMessage": "Auditing Herdr coordination..."
           }
@@ -315,8 +315,8 @@ Create `hooks/hooks.json`:
         "hooks": [
           {
             "type": "command",
-            "command": "node \"${CLAUDE_PLUGIN_ROOT}/skills/coordinating-herdr-agents/scripts/hook.mjs\"",
-            "commandWindows": "if (Get-Command node -ErrorAction SilentlyContinue) { node \"$env:CLAUDE_PLUGIN_ROOT\\skills\\coordinating-herdr-agents\\scripts\\hook.mjs\" }",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/skills/herdr-shepherd/scripts/hook.mjs\"",
+            "commandWindows": "if (Get-Command node -ErrorAction SilentlyContinue) { node \"$env:CLAUDE_PLUGIN_ROOT\\skills\\herdr-shepherd\\scripts\\hook.mjs\" }",
             "timeout": 15,
             "statusMessage": "Recording Herdr coordination..."
           }
@@ -338,8 +338,8 @@ Create `hooks/claude.json`:
         "hooks": [
           {
             "type": "command",
-            "command": "node \"${CLAUDE_PLUGIN_ROOT}/skills/coordinating-herdr-agents/scripts/hook.mjs\"",
-            "commandWindows": "if (Get-Command node -ErrorAction SilentlyContinue) { node \"$env:CLAUDE_PLUGIN_ROOT\\skills\\coordinating-herdr-agents\\scripts\\hook.mjs\" }",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/skills/herdr-shepherd/scripts/hook.mjs\"",
+            "commandWindows": "if (Get-Command node -ErrorAction SilentlyContinue) { node \"$env:CLAUDE_PLUGIN_ROOT\\skills\\herdr-shepherd\\scripts\\hook.mjs\" }",
             "timeout": 15,
             "statusMessage": "Auditing Herdr coordination..."
           }
@@ -352,8 +352,8 @@ Create `hooks/claude.json`:
         "hooks": [
           {
             "type": "command",
-            "command": "node \"${CLAUDE_PLUGIN_ROOT}/skills/coordinating-herdr-agents/scripts/hook.mjs\"",
-            "commandWindows": "if (Get-Command node -ErrorAction SilentlyContinue) { node \"$env:CLAUDE_PLUGIN_ROOT\\skills\\coordinating-herdr-agents\\scripts\\hook.mjs\" }",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/skills/herdr-shepherd/scripts/hook.mjs\"",
+            "commandWindows": "if (Get-Command node -ErrorAction SilentlyContinue) { node \"$env:CLAUDE_PLUGIN_ROOT\\skills\\herdr-shepherd\\scripts\\hook.mjs\" }",
             "timeout": 15,
             "statusMessage": "Recording Herdr coordination..."
           }
@@ -366,8 +366,8 @@ Create `hooks/claude.json`:
         "hooks": [
           {
             "type": "command",
-            "command": "node \"${CLAUDE_PLUGIN_ROOT}/skills/coordinating-herdr-agents/scripts/hook.mjs\"",
-            "commandWindows": "if (Get-Command node -ErrorAction SilentlyContinue) { node \"$env:CLAUDE_PLUGIN_ROOT\\skills\\coordinating-herdr-agents\\scripts\\hook.mjs\" }",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/skills/herdr-shepherd/scripts/hook.mjs\"",
+            "commandWindows": "if (Get-Command node -ErrorAction SilentlyContinue) { node \"$env:CLAUDE_PLUGIN_ROOT\\skills\\herdr-shepherd\\scripts\\hook.mjs\" }",
             "timeout": 15,
             "statusMessage": "Recording failed Herdr coordination..."
           }
@@ -400,20 +400,20 @@ git commit -m "Add plugin marketplace layout"
 ## Task 2: Cross-Platform Hooks, Installers, and Wrapper Parsing
 
 **Files:**
-- Modify: `skills/coordinating-herdr-agents/scripts/hook.mjs`
-- Modify: `skills/coordinating-herdr-agents/scripts/hook-lib.mjs`
-- Modify: `skills/coordinating-herdr-agents/scripts/configure-hooks.mjs`
+- Modify: `skills/herdr-shepherd/scripts/hook.mjs`
+- Modify: `skills/herdr-shepherd/scripts/hook-lib.mjs`
+- Modify: `skills/herdr-shepherd/scripts/configure-hooks.mjs`
 - Modify: `install.ps1`
 - Modify: `uninstall.ps1`
 - Create: `install.sh`
 - Create: `uninstall.sh`
-- Modify: `skills/coordinating-herdr-agents/SKILL.md`
+- Modify: `skills/herdr-shepherd/SKILL.md`
 - Modify: `tests/hook.test.mjs`
 - Modify: `tests/configure-hooks.test.mjs`
 - Modify: `tests/public-release.test.mjs`
 
 **Interfaces:**
-- Consumes: canonical runtime path `skills/coordinating-herdr-agents/scripts/hook.mjs`.
+- Consumes: canonical runtime path `skills/herdr-shepherd/scripts/hook.mjs`.
 - Produces: `runtimeFromEnvironment(env: object): 'codex' | 'claude-code' | 'unknown'`.
 - Produces: `extractCoordinationRequest(command: string): object` accepting PowerShell here-strings and POSIX literal heredocs.
 - Produces: `installHooks({ codexPath?: string, claudePath?: string, skillRoot: string }): Promise<void>`.
@@ -424,7 +424,7 @@ git commit -m "Add plugin marketplace layout"
 Add this helper beside `commandFor` in `tests/hook.test.mjs`:
 
 ```js
-const posixCommandFor = (value) => `node "$HOME/.codex/plugins/coordinating-herdr-agents/skills/coordinating-herdr-agents/scripts/coordinate.mjs" --stdin <<'JSON'\n${JSON.stringify(value)}\nJSON`;
+const posixCommandFor = (value) => `node "$HOME/.codex/plugins/herdr-shepherd/skills/herdr-shepherd/scripts/coordinate.mjs" --stdin <<'JSON'\n${JSON.stringify(value)}\nJSON`;
 ```
 
 Add this test in `tests/hook.test.mjs`:
@@ -448,7 +448,7 @@ test('POSIX literal heredoc wrapper request is accepted', async () => {
 Modify the import from `hook.mjs` in `tests/hook.test.mjs` after Task 1 paths are updated:
 
 ```js
-import { runtimeFromEnvironment } from '../skills/coordinating-herdr-agents/scripts/hook.mjs';
+import { runtimeFromEnvironment } from '../skills/herdr-shepherd/scripts/hook.mjs';
 ```
 
 Add this test:
@@ -473,7 +473,7 @@ Expected: FAIL because POSIX heredoc parsing is not implemented and `runtimeFrom
 
 - [ ] **Step 3: Implement runtime detection in `hook.mjs`**
 
-Replace the runtime line in `skills/coordinating-herdr-agents/scripts/hook.mjs` with this exported function and use it in `main()`:
+Replace the runtime line in `skills/herdr-shepherd/scripts/hook.mjs` with this exported function and use it in `main()`:
 
 ```js
 export function runtimeFromEnvironment(env = process.env) {
@@ -518,7 +518,7 @@ export function extractCoordinationRequest(command) {
 
 - [ ] **Step 5: Make hook configuration accept either host**
 
-In `skills/coordinating-herdr-agents/scripts/configure-hooks.mjs`, replace `commandFor` with:
+In `skills/herdr-shepherd/scripts/configure-hooks.mjs`, replace `commandFor` with:
 
 ```js
 function commandFor(skillRoot, runtime) {
@@ -603,7 +603,7 @@ test('installation can configure only the host that is present', async () => {
 In root `install.ps1`, set:
 
 ```powershell
-$skillRoot = Join-Path (Split-Path -Parent $MyInvocation.MyCommand.Path) 'skills\coordinating-herdr-agents'
+$skillRoot = Join-Path (Split-Path -Parent $MyInvocation.MyCommand.Path) 'skills\herdr-shepherd'
 $codexInstalled = [bool](Get-Command codex -ErrorAction SilentlyContinue)
 $claudeInstalled = [bool](Get-Command claude -ErrorAction SilentlyContinue)
 if (-not $codexInstalled -and -not $claudeInstalled) {
@@ -638,12 +638,12 @@ Create `install.sh`:
 set -eu
 
 repo_root=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
-skill_root="$repo_root/skills/coordinating-herdr-agents"
+skill_root="$repo_root/skills/herdr-shepherd"
 codex_home="${CODEX_HOME:-$HOME/.codex}"
 claude_home="$HOME/.claude"
 codex_hooks="$codex_home/hooks.json"
 claude_settings="$claude_home/settings.json"
-claude_link="$claude_home/skills/coordinating-herdr-agents"
+claude_link="$claude_home/skills/herdr-shepherd"
 state_dir="${XDG_STATE_HOME:-$HOME/.local/state}/Herdr/coordination-audit"
 
 command -v node >/dev/null 2>&1 || { echo "Required command is not available on PATH: node" >&2; exit 1; }
@@ -682,7 +682,7 @@ if [ "$codex_installed" -eq 1 ] && { [ ! -f "$codex_home/config.toml" ] || ! gre
   echo "Warning: Codex hooks are not enabled in config.toml. Add hooks = true under [features]." >&2
 fi
 
-echo "Installed coordinating-herdr-agents."
+echo "Installed herdr-shepherd."
 echo "Shared audit state: $state_dir"
 echo "Review and trust the new hooks in a fresh host session."
 ```
@@ -697,12 +697,12 @@ purge_audit_history=0
 [ "${1:-}" = "--purge-audit-history" ] && purge_audit_history=1
 
 repo_root=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
-skill_root="$repo_root/skills/coordinating-herdr-agents"
+skill_root="$repo_root/skills/herdr-shepherd"
 codex_home="${CODEX_HOME:-$HOME/.codex}"
 claude_home="$HOME/.claude"
 codex_hooks="$codex_home/hooks.json"
 claude_settings="$claude_home/settings.json"
-claude_link="$claude_home/skills/coordinating-herdr-agents"
+claude_link="$claude_home/skills/herdr-shepherd"
 state_dir="${XDG_STATE_HOME:-$HOME/.local/state}/Herdr/coordination-audit"
 
 codex_arg="-"
@@ -731,10 +731,10 @@ echo "Removed Herdr coordination hooks."
 
 - [ ] **Step 9: Update the skill examples for Windows and Linux**
 
-In `skills/coordinating-herdr-agents/SKILL.md`, keep the PowerShell example and add this POSIX example immediately after it:
+In `skills/herdr-shepherd/SKILL.md`, keep the PowerShell example and add this POSIX example immediately after it:
 
 ```sh
-node "$HOME/.codex/skills/coordinating-herdr-agents/scripts/coordinate.mjs" --stdin <<'JSON'
+node "$HOME/.codex/skills/herdr-shepherd/scripts/coordinate.mjs" --stdin <<'JSON'
 {"origin":"proactive","action":"herdr.exec","args":["agent","send","w2:p1","Resume the official installer build and report blockers here."],"target":{"type":"agent","id":"w2:p1"},"reason":"Continue paused work without duplicating it","message":"Resume the official installer build and report blockers here."}
 JSON
 ```
@@ -770,9 +770,9 @@ git commit -m "Add cross-platform hook installers"
 ## Task 3: Activity Viewer Reuse, Newest-First Events, and Deletion
 
 **Files:**
-- Modify: `skills/coordinating-herdr-agents/scripts/core.mjs`
-- Modify: `skills/coordinating-herdr-agents/scripts/hook-lib.mjs`
-- Modify: `skills/coordinating-herdr-agents/scripts/audit-server.mjs`
+- Modify: `skills/herdr-shepherd/scripts/core.mjs`
+- Modify: `skills/herdr-shepherd/scripts/hook-lib.mjs`
+- Modify: `skills/herdr-shepherd/scripts/audit-server.mjs`
 - Modify: `tests/coordination.test.mjs`
 - Modify: `tests/server.test.mjs`
 
@@ -1138,11 +1138,11 @@ git commit -m "Improve coordination activity viewer"
 
 **Files:**
 - Modify: `README.md`
-- Modify: `skills/coordinating-herdr-agents/SKILL.md`
+- Modify: `skills/herdr-shepherd/SKILL.md`
 - Modify: `tests/public-release.test.mjs`
 
 **Interfaces:**
-- Consumes: marketplace id `coordinating-herdr-agents@herdr`.
+- Consumes: marketplace id `herdr-shepherd@shepherd`.
 - Produces: value-first README with plugin setup before manual install.
 
 - [ ] **Step 1: Write README coverage tests**
@@ -1153,10 +1153,10 @@ Add this test to `tests/public-release.test.mjs`:
 test('README leads with plugin setup and common coordination workflows', async () => {
   const readme = await readFile(join(root, 'README.md'), 'utf8');
   const required = [
-    'codex plugin marketplace add talberthoule/coordinating-herdr-agents',
-    'codex plugin add coordinating-herdr-agents@herdr',
-    'claude plugin marketplace add talberthoule/coordinating-herdr-agents',
-    'claude plugin install coordinating-herdr-agents@herdr',
+    'codex plugin marketplace add talberthoule/herdr-shepherd',
+    'codex plugin add herdr-shepherd@shepherd',
+    'claude plugin marketplace add talberthoule/herdr-shepherd',
+    'claude plugin install herdr-shepherd@shepherd',
     './install.ps1',
     './install.sh',
     'discover active and paused work',
@@ -1184,9 +1184,9 @@ Expected: FAIL because the README is still Windows/manual-install-first.
 Replace `README.md` with:
 
 ````markdown
-# Herdr Agent Coordination
+# Herdr Shepherd
 
-Herdr Agent Coordination lets Codex and Claude Code sessions share work without guessing who owns a task. It gives each session a local protocol for discovering active work, avoiding duplicate edits, sending source-attributed handoffs, and reviewing a token-protected activity trail.
+Herdr Shepherd lets Codex and Claude Code sessions share work without guessing who owns a task. It gives each session a local protocol for discovering active work, avoiding duplicate edits, sending source-attributed handoffs, and reviewing a token-protected activity trail.
 
 It is deliberately small: Herdr remains the coordination layer, and this project adds skill instructions plus audited hooks around the Herdr CLI.
 
@@ -1195,22 +1195,22 @@ It is deliberately small: Herdr remains the coordination layer, and this project
 Codex:
 
 ```sh
-codex plugin marketplace add talberthoule/coordinating-herdr-agents
-codex plugin add coordinating-herdr-agents@herdr
+codex plugin marketplace add talberthoule/herdr-shepherd
+codex plugin add herdr-shepherd@shepherd
 ```
 
 Claude Code:
 
 ```sh
-claude plugin marketplace add talberthoule/coordinating-herdr-agents
-claude plugin install coordinating-herdr-agents@herdr
+claude plugin marketplace add talberthoule/herdr-shepherd
+claude plugin install herdr-shepherd@shepherd
 ```
 
 Review and trust the installed hooks through the normal host prompt. The hooks are what block raw Herdr mutations and record audited coordination actions.
 
 ## First Use
 
-Start a new agent session and ask it to use Herdr Agent Coordination before editing a shared repository. The skill will inspect Herdr first, read relevant panes, and only send an audited message when another session owns overlapping work or has context worth preserving.
+Start a new agent session and ask it to use Herdr Shepherd before editing a shared repository. The skill will inspect Herdr first, read relevant panes, and only send an audited message when another session owns overlapping work or has context worth preserving.
 
 The local activity viewer opens for proactive handoffs. It shows the newest events first, can delete one complete coordination action, and has a `Delete all history` control for clearing local audit history.
 
@@ -1241,16 +1241,16 @@ Manual install is useful when plugin marketplaces are unavailable or when testin
 Windows:
 
 ```powershell
-git clone https://github.com/talberthoule/coordinating-herdr-agents.git
-cd coordinating-herdr-agents
+git clone https://github.com/talberthoule/herdr-shepherd.git
+cd herdr-shepherd
 ./install.ps1
 ```
 
 Linux:
 
 ```sh
-git clone https://github.com/talberthoule/coordinating-herdr-agents.git
-cd coordinating-herdr-agents
+git clone https://github.com/talberthoule/herdr-shepherd.git
+cd herdr-shepherd
 ./install.sh
 ```
 
@@ -1307,7 +1307,7 @@ MIT
 
 - [ ] **Step 4: Update skill quick reference for the new viewer behavior**
 
-In `skills/coordinating-herdr-agents/SKILL.md`, replace:
+In `skills/herdr-shepherd/SKILL.md`, replace:
 
 ```markdown
 | Inspect audit | Viewer opens automatically after proactive send |
@@ -1334,7 +1334,7 @@ Expected: PASS.
 Run:
 
 ```powershell
-git add README.md skills/coordinating-herdr-agents/SKILL.md tests/public-release.test.mjs
+git add README.md skills/herdr-shepherd/SKILL.md tests/public-release.test.mjs
 git commit -m "Rewrite README for plugin distribution"
 ```
 
@@ -1436,11 +1436,11 @@ $oldCodexHome = $env:CODEX_HOME
 $env:CODEX_HOME = Join-Path ([IO.Path]::GetTempPath()) ('codex-plugin-test-' + [guid]::NewGuid())
 New-Item -ItemType Directory -Force -Path $env:CODEX_HOME | Out-Null
 codex plugin marketplace add . --json
-codex plugin add coordinating-herdr-agents@herdr --json
+codex plugin add herdr-shepherd@shepherd --json
 $env:CODEX_HOME = $oldCodexHome
 ```
 
-Expected: both Codex commands exit 0 and the add result names `coordinating-herdr-agents`.
+Expected: both Codex commands exit 0 and the add result names `herdr-shepherd`.
 
 - [ ] **Step 7: Smoke-test Claude plugin marketplace from the local checkout**
 
@@ -1448,9 +1448,9 @@ Run:
 
 ```powershell
 claude plugin marketplace add . --scope local
-claude plugin install coordinating-herdr-agents@herdr
-claude plugin uninstall coordinating-herdr-agents
-claude plugin marketplace remove herdr
+claude plugin install herdr-shepherd@shepherd
+claude plugin uninstall herdr-shepherd
+claude plugin marketplace remove shepherd
 ```
 
 Expected: install succeeds, uninstall succeeds, and the local marketplace is removed.

@@ -1,14 +1,14 @@
 {
-  "name": "herdr",
+  "name": "shepherd",
   "interface": {
-    "displayName": "Herdr"
+    "displayName": "Shepherd"
   },
   "plugins": [
     {
-      "name": "coordinating-herdr-agents",
+      "name": "herdr-shepherd",
       "source": {
         "source": "url",
-        "url": "https://github.com/talberthoule/coordinating-herdr-agents.git",
+        "url": "https://github.com/talberthoule/herdr-shepherd.git",
         "ref": "main"
       },
       "policy": {

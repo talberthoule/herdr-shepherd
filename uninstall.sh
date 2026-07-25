@@ -5,12 +5,12 @@ purge_audit_history=0
 [ "${1:-}" = "--purge-audit-history" ] && purge_audit_history=1
 
 repo_root=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
-skill_root="$repo_root/skills/coordinating-herdr-agents"
+skill_root="$repo_root/skills/herdr-shepherd"
 codex_home="${CODEX_HOME:-$HOME/.codex}"
 claude_home="$HOME/.claude"
 codex_hooks="$codex_home/hooks.json"
 claude_settings="$claude_home/settings.json"
-claude_link="$claude_home/skills/coordinating-herdr-agents"
+claude_link="$claude_home/skills/herdr-shepherd"
 state_dir="${XDG_STATE_HOME:-$HOME/.local/state}/Herdr/coordination-audit"
 
 codex_arg="-"

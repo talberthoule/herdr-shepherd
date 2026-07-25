@@ -140,7 +140,7 @@ export async function handleHookPayload(payload, options = {}) {
   const classification = classifyShellCommand(command);
   if (classification.kind === 'other' || classification.kind === 'read') return {};
   if (eventName === 'PreToolUse' && classification.kind === 'raw-mutation') {
-    return { output: deny('Raw Herdr mutations are blocked. Use the coordinating-herdr-agents audited wrapper.') };
+    return { output: deny('Raw Herdr mutations are blocked. Use the herdr-shepherd audited wrapper.') };
   }
   if (classification.kind !== 'wrapper') return {};
 

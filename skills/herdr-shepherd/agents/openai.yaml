@@ -1,0 +1,4 @@
+interface:
+  display_name: "Herdr Shepherd"
+  short_description: "Coordinate work across Herdr tabs and agents"
+  default_prompt: "Use $herdr-shepherd to recover and coordinate work across Herdr tabs."

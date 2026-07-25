@@ -4,9 +4,9 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
 
-import { listAuditEvents } from '../skills/coordinating-herdr-agents/scripts/core.mjs';
-import { handleHookPayload } from '../skills/coordinating-herdr-agents/scripts/hook-lib.mjs';
-import { runtimeFromEnvironment } from '../skills/coordinating-herdr-agents/scripts/hook.mjs';
+import { listAuditEvents } from '../skills/herdr-shepherd/scripts/core.mjs';
+import { handleHookPayload } from '../skills/herdr-shepherd/scripts/hook-lib.mjs';
+import { runtimeFromEnvironment } from '../skills/herdr-shepherd/scripts/hook.mjs';
 
 const request = {
   origin: 'proactive',
@@ -18,7 +18,7 @@ const request = {
 };
 
 const commandFor = (value) => `@'\n${JSON.stringify(value)}\n'@ | node "C:\\skill\\coordinate.mjs" --stdin`;
-const posixCommandFor = (value) => `node "$HOME/.codex/plugins/coordinating-herdr-agents/skills/coordinating-herdr-agents/scripts/coordinate.mjs" --stdin <<'JSON'\n${JSON.stringify(value)}\nJSON`;
+const posixCommandFor = (value) => `node "$HOME/.codex/plugins/herdr-shepherd/skills/herdr-shepherd/scripts/coordinate.mjs" --stdin <<'JSON'\n${JSON.stringify(value)}\nJSON`;
 
 async function stateDir() {
   return mkdtemp(join(tmpdir(), 'herdr-hook-'));
