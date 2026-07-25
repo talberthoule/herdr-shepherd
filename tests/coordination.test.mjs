@@ -9,12 +9,32 @@ import {
   appendAuditEvent,
   classifyShellCommand,
   clearViewedHistory,
+  defaultStateDir,
   deleteAllAuditHistory,
   deleteAuditAction,
   listAuditEvents,
   redactOutboundText,
   validateCoordinationRequest,
 } from '../skills/herdr-shepherd/scripts/core.mjs';
+
+test('default audit state uses the shepherd namespace on every platform', () => {
+  assert.equal(
+    defaultStateDir({ LOCALAPPDATA: 'C:\\state' }, 'win32'),
+    'C:\\state\\Herdr\\shepherd-audit',
+  );
+  assert.equal(
+    defaultStateDir({ HOME: '/home/test' }, 'linux'),
+    '/home/test/.local/state/Herdr/shepherd-audit',
+  );
+  assert.equal(
+    defaultStateDir({ HOME: '/home/test', XDG_STATE_HOME: '/state' }, 'linux'),
+    '/state/Herdr/shepherd-audit',
+  );
+  assert.equal(
+    defaultStateDir({ HERDR_SHEPHERD_STATE_DIR: '/custom' }, 'linux'),
+    '/custom',
+  );
+});
 
 async function stateDir() {
   return mkdtemp(join(tmpdir(), 'herdr-coordination-'));

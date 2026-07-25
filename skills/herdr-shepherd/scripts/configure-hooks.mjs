@@ -10,7 +10,7 @@ async function readJson(path) {
 
 async function save(path, value) {
   await mkdir(dirname(path), { recursive: true });
-  try { await copyFile(path, `${path}.herdr-coordination.bak`, constants.COPYFILE_EXCL); } catch (error) { if (!['ENOENT', 'EEXIST'].includes(error.code)) throw error; }
+  try { await copyFile(path, `${path}.herdr-shepherd.bak`, constants.COPYFILE_EXCL); } catch (error) { if (!['ENOENT', 'EEXIST'].includes(error.code)) throw error; }
   const temporary = `${path}.${process.pid}.tmp`;
   await writeFile(temporary, `${JSON.stringify(value, null, 2)}\n`, 'utf8');
   await rename(temporary, path);

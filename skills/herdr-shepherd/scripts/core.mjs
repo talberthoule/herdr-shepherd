@@ -1,6 +1,6 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { appendFile, mkdir, open, readFile, rename, rm, stat, writeFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { join, posix, win32 } from 'node:path';
 
 const READ_COMMANDS = new Set([
   'agent explain', 'agent get', 'agent list', 'agent read', 'agent wait',
@@ -19,9 +19,13 @@ const SECRET_PATTERNS = [
 
 const wait = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
 
-export function defaultStateDir() {
-  return process.env.HERDR_COORDINATION_STATE_DIR
-    || join(process.env.LOCALAPPDATA || process.env.HOME || '.', 'Herdr', 'coordination-audit');
+export function defaultStateDir(environment = process.env, platform = process.platform) {
+  if (environment.HERDR_SHEPHERD_STATE_DIR) return environment.HERDR_SHEPHERD_STATE_DIR;
+  const path = platform === 'win32' ? win32 : posix;
+  const base = platform === 'win32'
+    ? (environment.LOCALAPPDATA || environment.HOME || '.')
+    : (environment.XDG_STATE_HOME || path.join(environment.HOME || '.', '.local', 'state'));
+  return path.join(base, 'Herdr', 'shepherd-audit');
 }
 
 export function classifyShellCommand(command = '') {

@@ -9,7 +9,7 @@
             "command": "node \"${CLAUDE_PLUGIN_ROOT}/skills/herdr-shepherd/scripts/hook.mjs\"",
             "commandWindows": "if (Get-Command node -ErrorAction SilentlyContinue) { node \"$env:CLAUDE_PLUGIN_ROOT\\skills\\herdr-shepherd\\scripts\\hook.mjs\" }",
             "timeout": 15,
-            "statusMessage": "Auditing Herdr coordination..."
+            "statusMessage": "Auditing Herdr Shepherd coordination..."
           }
         ]
       }
@@ -23,7 +23,7 @@
             "command": "node \"${CLAUDE_PLUGIN_ROOT}/skills/herdr-shepherd/scripts/hook.mjs\"",
             "commandWindows": "if (Get-Command node -ErrorAction SilentlyContinue) { node \"$env:CLAUDE_PLUGIN_ROOT\\skills\\herdr-shepherd\\scripts\\hook.mjs\" }",
             "timeout": 15,
-            "statusMessage": "Recording Herdr coordination..."
+            "statusMessage": "Recording Herdr Shepherd coordination..."
           }
         ]
       }
@@ -37,7 +37,7 @@
             "command": "node \"${CLAUDE_PLUGIN_ROOT}/skills/herdr-shepherd/scripts/hook.mjs\"",
             "commandWindows": "if (Get-Command node -ErrorAction SilentlyContinue) { node \"$env:CLAUDE_PLUGIN_ROOT\\skills\\herdr-shepherd\\scripts\\hook.mjs\" }",
             "timeout": 15,
-            "statusMessage": "Recording failed Herdr coordination..."
+            "statusMessage": "Recording failed Herdr Shepherd coordination..."
           }
         ]
       }

@@ -9,7 +9,7 @@ $codexHooks = Join-Path $codexHome 'hooks.json'
 $claudeSettings = Join-Path $claudeHome 'settings.json'
 $claudeSkills = Join-Path $claudeHome 'skills'
 $claudeLink = Join-Path $claudeSkills 'herdr-shepherd'
-$stateDir = Join-Path $env:LOCALAPPDATA 'Herdr\coordination-audit'
+$stateDir = Join-Path $env:LOCALAPPDATA 'Herdr\shepherd-audit'
 $codexInstalled = [bool](Get-Command codex -ErrorAction SilentlyContinue)
 $claudeInstalled = [bool](Get-Command claude -ErrorAction SilentlyContinue)
 
@@ -46,6 +46,6 @@ if ($codexInstalled -and (-not (Test-Path -LiteralPath $codexConfig) -or -not (S
     Write-Warning 'Codex hooks are not enabled in config.toml. Add `hooks = true` under `[features]`.'
 }
 
-Write-Host 'Installed herdr-shepherd.'
+Write-Host 'Installed Herdr Shepherd.'
 Write-Host "Shared audit state: $stateDir"
 Write-Host 'Review and trust the new hooks in a fresh host session. This installer does not bypass trust review.'
