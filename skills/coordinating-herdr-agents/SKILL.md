@@ -64,12 +64,15 @@ Agents in the same repo usually share ONE git working tree. Git state is therefo
 - `git status` can show another agent's uncommitted edits.
 - Any `checkout`, `checkout -b`, `merge`, or `stash` sweeps their in-flight work onto your branch.
 
-Before your first git mutation or file edit, snapshot, then read `git branch --show-current` and `git status --short`. If another agent holds the tree, either **take an isolated worktree** (`git worktree add <path outside the repo> -b <branch> main`) or **take a lane that never touches the tree** (review, docs, issue-tracker hygiene).
+Before your first git mutation or file edit, snapshot, then read `git branch --show-current` and `git status --short`. If another agent holds the tree, either **take an isolated worktree** (`git worktree add <path outside the repo and outside any synced folder> -b <branch> main`) or **take a lane that never touches the tree** (review, docs, issue-tracker hygiene).
 
-Two corollaries that are easy to get wrong:
+Three corollaries that are easy to get wrong:
 
 - **Never park on `main` in a worktree.** Git forbids the same branch in two worktrees, so holding `main` silently blocks the tree-holder's `git checkout main; git merge --ff-only <branch>` at merge time. You break the merge step for everyone else without touching a file.
 - **Review needs no checkout.** `git diff main...<branch>`, `git show <rev>:<path>`, and `git log` fully review a pushed branch read-only — which is exactly what makes a reviewer lane safe to run alongside a coding agent.
+- **Never put a worktree inside a cloud-synced folder.** OneDrive, Dropbox, and iCloud rewrite metadata and dehydrate files underneath git, which destroys the `.git` pointer file linking a worktree to its parent repo. Outside the repo is not enough; it must be outside the sync root. Use a local path such as `C:/work/<repo>/<lane>`.
+
+A worktree broken this way is silent and looks healthy. The directory is still there, `git worktree list` may still list it, and only the operations fail: `git -C <path> status` errors, `git worktree remove` refuses with "not a working tree", and `git worktree prune` quietly drops the registration while leaving the directory behind. Anything uncommitted in it is unrecoverable, because git no longer has a handle on it. One repository lost every worktree it had this way, twice within an hour, and survived only because each lane had already been merged. Commit early on a worktree lane; an uncommitted checkout there is not durable storage.
 
 Also check whether the project's containers/toolchain bind the *main* checkout; if they do, a worktree cannot run the stack, and it suits docs/review/analysis rather than code that needs integration testing.
 
@@ -219,6 +222,8 @@ The hook records attempted and outcome events, redacts obvious secrets, and open
 - Do not put literal `Herdr <word>` prose inside unrelated shell command bodies; the hook scans complete command text and may classify it as a raw Herdr mutation. Reword or pass the text another way.
 - Do not `checkout`, `checkout -b`, `merge`, or `stash` in a shared working tree before confirming who holds it — you will sweep another agent's uncommitted work onto your branch.
 - Do not park on `main` in a worktree. It blocks the tree-holder's merge, and nothing tells you that you did it.
+- Do not create a worktree inside a cloud-synced folder. The sync client breaks its `.git` pointer file, and uncommitted work in it becomes unrecoverable.
+- Do not read an empty `git -C <dir> status` as a clean worktree. On a broken worktree the command fails and prints nothing, so counting output lines scores it identical to clean. Check the command succeeded before trusting the result.
 - Do not rely on a submitted `agent send` to stop an imminent collision. It is a queued message, not an interrupt. Escalate time-critical conflicts to the user.
 - Do not inline long payloads in a send. A send that races a busy composer arrives head-truncated; keep sends compact, number multi-part sends, and verify delivery by pane read.
 - Do not judge overlap by tab label. Read the other agent's plan; near-identical work often hides behind different names.
