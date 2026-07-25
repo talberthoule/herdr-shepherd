@@ -304,7 +304,7 @@ Create `hooks/hooks.json`:
             "command": "node \"${CLAUDE_PLUGIN_ROOT}/skills/herdr-shepherd/scripts/hook.mjs\"",
             "commandWindows": "if (Get-Command node -ErrorAction SilentlyContinue) { node \"$env:CLAUDE_PLUGIN_ROOT\\skills\\herdr-shepherd\\scripts\\hook.mjs\" }",
             "timeout": 15,
-            "statusMessage": "Auditing Herdr coordination..."
+            "statusMessage": "Auditing Herdr Shepherd coordination..."
           }
         ]
       }
@@ -318,7 +318,7 @@ Create `hooks/hooks.json`:
             "command": "node \"${CLAUDE_PLUGIN_ROOT}/skills/herdr-shepherd/scripts/hook.mjs\"",
             "commandWindows": "if (Get-Command node -ErrorAction SilentlyContinue) { node \"$env:CLAUDE_PLUGIN_ROOT\\skills\\herdr-shepherd\\scripts\\hook.mjs\" }",
             "timeout": 15,
-            "statusMessage": "Recording Herdr coordination..."
+            "statusMessage": "Recording Herdr Shepherd coordination..."
           }
         ]
       }
@@ -341,7 +341,7 @@ Create `hooks/claude.json`:
             "command": "node \"${CLAUDE_PLUGIN_ROOT}/skills/herdr-shepherd/scripts/hook.mjs\"",
             "commandWindows": "if (Get-Command node -ErrorAction SilentlyContinue) { node \"$env:CLAUDE_PLUGIN_ROOT\\skills\\herdr-shepherd\\scripts\\hook.mjs\" }",
             "timeout": 15,
-            "statusMessage": "Auditing Herdr coordination..."
+            "statusMessage": "Auditing Herdr Shepherd coordination..."
           }
         ]
       }
@@ -355,7 +355,7 @@ Create `hooks/claude.json`:
             "command": "node \"${CLAUDE_PLUGIN_ROOT}/skills/herdr-shepherd/scripts/hook.mjs\"",
             "commandWindows": "if (Get-Command node -ErrorAction SilentlyContinue) { node \"$env:CLAUDE_PLUGIN_ROOT\\skills\\herdr-shepherd\\scripts\\hook.mjs\" }",
             "timeout": 15,
-            "statusMessage": "Recording Herdr coordination..."
+            "statusMessage": "Recording Herdr Shepherd coordination..."
           }
         ]
       }
@@ -369,7 +369,7 @@ Create `hooks/claude.json`:
             "command": "node \"${CLAUDE_PLUGIN_ROOT}/skills/herdr-shepherd/scripts/hook.mjs\"",
             "commandWindows": "if (Get-Command node -ErrorAction SilentlyContinue) { node \"$env:CLAUDE_PLUGIN_ROOT\\skills\\herdr-shepherd\\scripts\\hook.mjs\" }",
             "timeout": 15,
-            "statusMessage": "Recording failed Herdr coordination..."
+            "statusMessage": "Recording failed Herdr Shepherd coordination..."
           }
         ]
       }
@@ -644,7 +644,7 @@ claude_home="$HOME/.claude"
 codex_hooks="$codex_home/hooks.json"
 claude_settings="$claude_home/settings.json"
 claude_link="$claude_home/skills/herdr-shepherd"
-state_dir="${XDG_STATE_HOME:-$HOME/.local/state}/Herdr/coordination-audit"
+state_dir="${XDG_STATE_HOME:-$HOME/.local/state}/Herdr/shepherd-audit"
 
 command -v node >/dev/null 2>&1 || { echo "Required command is not available on PATH: node" >&2; exit 1; }
 command -v herdr >/dev/null 2>&1 || { echo "Required command is not available on PATH: herdr" >&2; exit 1; }
@@ -703,7 +703,7 @@ claude_home="$HOME/.claude"
 codex_hooks="$codex_home/hooks.json"
 claude_settings="$claude_home/settings.json"
 claude_link="$claude_home/skills/herdr-shepherd"
-state_dir="${XDG_STATE_HOME:-$HOME/.local/state}/Herdr/coordination-audit"
+state_dir="${XDG_STATE_HOME:-$HOME/.local/state}/Herdr/shepherd-audit"
 
 codex_arg="-"
 claude_arg="-"
@@ -720,12 +720,12 @@ fi
 
 rm -f "$state_dir/viewer.json"
 if [ "$purge_audit_history" -eq 1 ] && [ -d "$state_dir" ]; then
-  expected="${XDG_STATE_HOME:-$HOME/.local/state}/Herdr/coordination-audit"
+  expected="${XDG_STATE_HOME:-$HOME/.local/state}/Herdr/shepherd-audit"
   [ "$state_dir" = "$expected" ] || { echo "Refusing to purge unexpected path: $state_dir" >&2; exit 1; }
   rm -rf "$state_dir"
 fi
 
-echo "Removed Herdr coordination hooks."
+echo "Removed Herdr Shepherd hooks."
 [ "$purge_audit_history" -eq 0 ] && echo "Preserved audit history at $state_dir"
 ```
 
@@ -996,7 +996,7 @@ function defaultOpenUrl(url) {
     browser.unref();
     return;
   }
-  process.stderr.write(`Herdr coordination audit: ${url}\n`);
+  process.stderr.write(`Herdr Shepherd audit: ${url}\n`);
 }
 ```
 
@@ -1029,7 +1029,7 @@ if (openBrowser && (started || !pageActive(existing))) {
   try {
     await (options.openUrl || defaultOpenUrl)(url);
   } catch {
-    process.stderr.write(`Herdr coordination audit: ${url}\n`);
+    process.stderr.write(`Herdr Shepherd audit: ${url}\n`);
   }
 }
 return url;
@@ -1231,8 +1231,8 @@ The hook rejects raw Herdr mutations, blocks obvious secrets in outbound message
 
 Audit state stays on your machine:
 
-- Windows: `%LOCALAPPDATA%\Herdr\coordination-audit`
-- Linux: `${XDG_STATE_HOME:-$HOME/.local/state}/Herdr/coordination-audit`
+- Windows: `%LOCALAPPDATA%\Herdr\shepherd-audit`
+- Linux: `${XDG_STATE_HOME:-$HOME/.local/state}/Herdr/shepherd-audit`
 
 ## Manual Install
 

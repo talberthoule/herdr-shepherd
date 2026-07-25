@@ -31,7 +31,7 @@ if ($claudeInstalled -and (Test-Path -LiteralPath $claudeLink)) {
     $item = Get-Item -LiteralPath $claudeLink -Force
     $targets = @($item.Target | ForEach-Object { [IO.Path]::GetFullPath($_) })
     if ($item.LinkType -eq 'Junction' -and $targets -contains [IO.Path]::GetFullPath($skillRoot)) {
-        Remove-Item -LiteralPath $claudeLink -Force
+        [IO.Directory]::Delete($claudeLink, $false)
     } else {
         Write-Warning "Preserved unexpected Claude skill path: $claudeLink"
     }
