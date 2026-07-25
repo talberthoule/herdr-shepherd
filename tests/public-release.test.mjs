@@ -98,14 +98,14 @@ test('retired product state identity appears only in migration history', async (
     'Recording Herdr ' + 'coordination...',
     'Recording failed Herdr ' + 'coordination...',
     'Removed Herdr ' + 'coordination hooks.',
-    '.herdr' + '.bak',
+    '.herdr-coordination' + '.bak',
   ];
   const pending = [root];
   while (pending.length) {
     const dir = pending.pop();
     for (const entry of await readdir(dir, { withFileTypes: true })) {
       const path = join(dir, entry.name);
-      if (entry.isDirectory() && !entry.name.startsWith('.git')) pending.push(path);
+      if (entry.isDirectory() && entry.name !== '.git') pending.push(path);
       else if (!allowed.has(path) && /\.(?:json|md|mjs|ps1|sh|yaml|yml)$/.test(entry.name)) {
         const content = await readFile(path, 'utf8');
         for (const value of forbidden) assert.ok(!content.includes(value), `${path} contains ${value}`);
@@ -129,7 +129,7 @@ test('public repository excludes private local identifiers', async () => {
     const dir = pending.pop();
     for (const entry of await readdir(dir, { withFileTypes: true })) {
       const path = join(dir, entry.name);
-      if (entry.isDirectory() && !entry.name.startsWith('.git')) pending.push(path);
+      if (entry.isDirectory() && entry.name !== '.git') pending.push(path);
       else if (/\.(?:json|md|mjs|ps1|sh|yaml|yml)$/.test(entry.name)) {
         const content = await readFile(path, 'utf8');
         for (const value of forbidden) assert.ok(!content.includes(value), `${path} contains ${value}`);
