@@ -73,5 +73,10 @@ test('controlled fake-Herdr simulation keeps lifecycle mutations user-directed',
   const calls = (await readFile(log, 'utf8')).trim().split(/\r?\n/).map(JSON.parse);
   assert.deepEqual(calls.filter((call) => call[0] === 'pane' && call[1] === 'close'), [['pane', 'close', 'w2:p6']]);
   assert.equal(calls.some((call) => call.includes('w4:p1') && call[1] === 'close'), false);
-  assert.equal(calls.filter((call) => call[0] === 'agent' && call[1] === 'get' && call[2] === 'w2:p6').length, 2);
+  // Every send to the helper is bracketed by a status probe: existence/status
+  // before it, delivery verdict after it.
+  const sends = calls.filter((call) => call[0] === 'pane' && call[1] === 'send-text' && call[2] === 'w2:p6').length;
+  const probes = calls.filter((call) => call[0] === 'agent' && call[1] === 'get' && call[2] === 'w2:p6').length;
+  assert.equal(sends, 3);
+  assert.equal(probes, sends * 2, 'each send should probe the target before and after');
 });

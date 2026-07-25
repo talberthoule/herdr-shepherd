@@ -41,7 +41,12 @@ function outcome(payload) {
   const failed = payload.hook_event_name === 'PostToolUseFailure'
     || /"(?:exit_code|exitCode)"\s*:\s*[1-9]/.test(text)
     || /(?:^|\s)(?:error|failed):/i.test(text);
-  return { phase: failed ? 'failed' : 'succeeded', summary: redactOutboundText(text.slice(0, 1000)).redacted };
+  const delivery = text.match(/coordination-delivery:\s*(confirmed|unconfirmed|queued|unknown)/)?.[1];
+  return {
+    phase: failed ? 'failed' : 'succeeded',
+    summary: redactOutboundText(text.slice(0, 1000)).redacted,
+    delivery,
+  };
 }
 
 function pageActive(viewer) {
@@ -182,7 +187,12 @@ export async function handleHookPayload(payload, options = {}) {
   }
   if (eventName === 'PostToolUse' || eventName === 'PostToolUseFailure') {
     const result = outcome(payload);
-    await appendAuditEvent(stateDir, { ...base, phase: result.phase, outcome_summary: result.summary });
+    await appendAuditEvent(stateDir, {
+      ...base,
+      phase: result.phase,
+      outcome_summary: result.summary,
+      ...(result.delivery ? { delivery: result.delivery } : {}),
+    });
   }
   return {};
 }

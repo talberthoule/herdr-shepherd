@@ -35,6 +35,7 @@ test('proactive send identifies its source and submits with a delayed Enter', as
       HERDR_TAB_ID: 'w1:tE',
     },
     inputDelayMs: 0,
+    deliveryProbeDelayMs: 0,
   });
   assert.equal(result.exitCode, 0);
   const calls = (await readFile(log, 'utf8')).trim().split(/\r?\n/).map(JSON.parse);
@@ -43,6 +44,8 @@ test('proactive send identifies its source and submits with a delayed Enter', as
     ['tab', 'get', 'w1:tE'],
     ['pane', 'send-text', 'w2:p1', '[Herdr from "codex-complete-MRs-2" (w1:pE)] Resume the official installer build.'],
     ['pane', 'send-keys', 'w2:p1', 'enter'],
+    // Post-send status probe: the send reports success, this decides delivery.
+    ['agent', 'get', 'w2:p1'],
   ]);
 });
 

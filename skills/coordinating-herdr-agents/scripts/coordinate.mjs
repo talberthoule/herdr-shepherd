@@ -6,6 +6,27 @@ import { validateCoordinationRequest } from './core.mjs';
 
 const wait = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
 
+// A target that is mid-turn is already "working", so a send to it cannot be
+// distinguished from one that stuck in the composer. Only an idle target that
+// starts working proves the Enter submitted.
+const ACTIVE_STATUS = new Set(['working', 'busy', 'running']);
+
+export const DELIVERY_MARKER = 'coordination-delivery';
+
+function agentStatus(stdout) {
+  try {
+    return JSON.parse(stdout).result?.agent?.agent_status ?? null;
+  } catch {
+    return null;
+  }
+}
+
+export function deliveryVerdict(before, after) {
+  if (before === null || after === null) return 'unknown';
+  if (ACTIVE_STATUS.has(before)) return 'queued';
+  return ACTIVE_STATUS.has(after) ? 'confirmed' : 'unconfirmed';
+}
+
 function run(command, args, env) {
   return new Promise((resolvePromise, reject) => {
     const child = spawn(command, args, { env, windowsHide: true });
@@ -27,9 +48,15 @@ export async function executeCoordinationRequest(request, options = {}) {
   const command = options.command || process.env.HERDR_BIN || (process.platform === 'win32' ? 'herdr.exe' : 'herdr');
   const prefixArgs = options.prefixArgs || [];
   const env = options.env || process.env;
+  let statusBefore = null;
+  // Tracked separately from statusBefore: an unparseable probe is still a probe,
+  // and must not trigger a second round trip.
+  let probedBefore = false;
   if (request.origin === 'proactive') {
     const check = await run(command, [...prefixArgs, 'agent', 'get', request.target.id], env);
     if (check.exitCode !== 0) throw new Error(`target agent does not exist: ${request.target.id}`);
+    statusBefore = agentStatus(check.stdout);
+    probedBefore = true;
   }
   if (request.args[0] === 'agent' && request.args[1] === 'send') {
     const sourcePane = env.HERDR_PANE_ID;
@@ -40,11 +67,23 @@ export async function executeCoordinationRequest(request, options = {}) {
     }
     const source = sourceLabel ? `"${String(sourceLabel).replace(/\s+/g, ' ').trim()}" (${sourcePane})` : sourcePane || 'another session';
     const text = `[Herdr from ${source}] ${request.message}`;
+    if (!probedBefore) {
+      const probe = await run(command, [...prefixArgs, 'agent', 'get', request.target.id], env);
+      statusBefore = agentStatus(probe.stdout);
+    }
     const typed = await run(command, [...prefixArgs, 'pane', 'send-text', request.target.id, text], env);
     if (typed.exitCode !== 0) return typed;
     // ponytail: fixed gap avoids Herdr/Codex's paste/Enter race; remove when pane run submits reliably.
     await wait(options.inputDelayMs ?? 100);
-    return run(command, [...prefixArgs, 'pane', 'send-keys', request.target.id, 'enter'], env);
+    const submitted = await run(command, [...prefixArgs, 'pane', 'send-keys', request.target.id, 'enter'], env);
+    if (submitted.exitCode !== 0) return submitted;
+    // A send reports success once the keystrokes are delivered, which is not the
+    // same as the target submitting them. Probe the status so the audit trail
+    // records a delivery verdict instead of implying one.
+    await wait(options.deliveryProbeDelayMs ?? 1500);
+    const after = await run(command, [...prefixArgs, 'agent', 'get', request.target.id], env);
+    const verdict = deliveryVerdict(statusBefore, agentStatus(after.stdout));
+    return { ...submitted, stdout: `${submitted.stdout}\n${DELIVERY_MARKER}: ${verdict}\n` };
   }
   return run(command, [...prefixArgs, ...request.args], env);
 }
