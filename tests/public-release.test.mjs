@@ -73,6 +73,47 @@ test('README leads with plugin setup and common coordination workflows', async (
   assert.ok(readme.indexOf('## Install') < readme.indexOf('## Manual Install'), 'plugin install should appear before manual install');
 });
 
+test('README documents the Shepherd audit state identity', async () => {
+  const readme = await readFile(join(root, 'README.md'), 'utf8');
+  for (const value of [
+    '%LOCALAPPDATA%\\Herdr\\shepherd-audit',
+    '${XDG_STATE_HOME:-$HOME/.local/state}/Herdr/shepherd-audit',
+    'HERDR_SHEPHERD_STATE_DIR',
+  ]) {
+    assert.ok(readme.includes(value), `README is missing ${value}`);
+  }
+});
+
+test('retired product state identity appears only in migration history', async () => {
+  const allowed = new Set([
+    join(root, 'docs', 'superpowers', 'specs', '2026-07-25-herdr-shepherd-migration-design.md'),
+    join(root, 'docs', 'superpowers', 'plans', '2026-07-25-herdr-shepherd-migration.md'),
+  ]);
+  const forbidden = [
+    'coordination-' + 'audit',
+    'HERDR_' + 'COORDINATION_STATE_DIR',
+    'Herdr coordination ' + 'audit',
+    'Herdr coordination ' + 'hook failed',
+    'Auditing Herdr ' + 'coordination...',
+    'Recording Herdr ' + 'coordination...',
+    'Recording failed Herdr ' + 'coordination...',
+    'Removed Herdr ' + 'coordination hooks.',
+    '.herdr' + '.bak',
+  ];
+  const pending = [root];
+  while (pending.length) {
+    const dir = pending.pop();
+    for (const entry of await readdir(dir, { withFileTypes: true })) {
+      const path = join(dir, entry.name);
+      if (entry.isDirectory() && !entry.name.startsWith('.git')) pending.push(path);
+      else if (!allowed.has(path) && /\.(?:json|md|mjs|ps1|sh|yaml|yml)$/.test(entry.name)) {
+        const content = await readFile(path, 'utf8');
+        for (const value of forbidden) assert.ok(!content.includes(value), `${path} contains ${value}`);
+      }
+    }
+  }
+});
+
 test('CI runs the Node suite on Windows and Ubuntu', async () => {
   const workflow = await readFile(join(root, '.github/workflows/test.yml'), 'utf8');
   assert.match(workflow, /windows-latest/);

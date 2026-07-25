@@ -70,8 +70,9 @@ The hook rejects raw Herdr mutations, blocks obvious secrets in outbound message
 
 Audit state stays on your machine:
 
-- Windows: `%LOCALAPPDATA%\Herdr\coordination-audit`
-- Linux: `${XDG_STATE_HOME:-$HOME/.local/state}/Herdr/coordination-audit`
+- Windows: `%LOCALAPPDATA%\Herdr\shepherd-audit`
+- Linux: `${XDG_STATE_HOME:-$HOME/.local/state}/Herdr/shepherd-audit`
+- Runtime override: `HERDR_SHEPHERD_STATE_DIR`
 
 ## Manual Install
 
