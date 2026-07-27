@@ -34,4 +34,14 @@ The profile hook records both attempted and succeeded/failed phases with sequenc
 
 Read-only commands such as `api snapshot`, `pane read`, and `agent list` are not logged. A raw mutating Herdr command is denied; repeat it through the wrapper. Obvious tokens, passwords, API keys, bearer credentials, and private keys are blocked before execution and are not retained verbatim.
 
+Quoted arguments are treated as data, so prose that merely names the product does not read as an invocation. Unquoted text and heredoc bodies are still scanned, and a string passed to an interpreter such as `bash -c` is classified by what it would execute.
+
+## Audit enforcement
+
+The hook records the `attempted` phase before the command runs, so the wrapper can verify its own coverage. If no matching `attempted` event exists when the wrapper starts, the hook did not run and the wrapper refuses the send with `refusing to send unaudited`. The check matches on origin, target id, and the message SHA-256 within a recent window; a request repeated verbatim inside that window can be vouched for by the earlier attempt.
+
+`HERDR_SHEPHERD_ALLOW_UNAUDITED=1` skips the check and appends `audit=bypassed` to the wrapper's output. It exists for direct invocation outside a hooked session and for tests, not as a way past a refusal.
+
+Every run prints `coordination-wrapper: <name> <version> (<path>)` before any other output, and the outcome event stores that value as `wrapper`. This makes the absence of output unambiguous: it means the wrapper never executed, which is a path or environment fault rather than a delivery result. Do not infer a verdict from silence.
+
 The viewer binds only to `127.0.0.1`, uses a random per-run token and strict CSP, loads no remote assets, opens one browser tab per viewer process, and defaults to succeeded events. **Viewed & close** acknowledges the highest displayed sequence and stops the viewer. Browser-tab close alone does not acknowledge it. **Clear viewed history** deletes only acknowledged entries after confirmation.

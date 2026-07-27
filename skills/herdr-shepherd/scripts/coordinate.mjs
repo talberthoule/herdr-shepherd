@@ -1,8 +1,9 @@
 import { spawn } from 'node:child_process';
-import { basename } from 'node:path';
+import { readFile } from 'node:fs/promises';
+import { basename, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { validateCoordinationRequest } from './core.mjs';
+import { defaultStateDir, listAuditEvents, redactOutboundText, validateCoordinationRequest } from './core.mjs';
 
 const wait = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
 
@@ -12,6 +13,54 @@ const wait = (milliseconds) => new Promise((resolve) => setTimeout(resolve, mill
 const ACTIVE_STATUS = new Set(['working', 'busy', 'running']);
 
 export const DELIVERY_MARKER = 'coordination-delivery';
+export const WRAPPER_MARKER = 'coordination-wrapper';
+// The hook writes its `attempted` event before the command runs, so a matching
+// event must already exist by the time this process starts. The window only has
+// to cover hook execution, which includes a viewer launch on the proactive path.
+export const AUDIT_MATCH_WINDOW_MS = 120_000;
+
+// Silence must mean exactly one thing: the wrapper never ran. Every run
+// therefore names which wrapper ran and from where, so a stale path or a
+// superseded plugin copy is visible in the tool result instead of reading as a
+// quiet delivery.
+export async function wrapperIdentity(scriptPath = fileURLToPath(import.meta.url)) {
+  const root = dirname(dirname(dirname(dirname(scriptPath))));
+  for (const manifest of ['.claude-plugin', '.codex-plugin']) {
+    try {
+      const { name, version } = JSON.parse(await readFile(join(root, manifest, 'plugin.json'), 'utf8'));
+      if (name && version) return `${name} ${version} (${scriptPath})`;
+    } catch { /* absent in a bare skill install; fall through to the unversioned form */ }
+  }
+  return `herdr-shepherd unknown-version (${scriptPath})`;
+}
+
+export function findAuditedAttempt(events, request, now = Date.now(), windowMs = AUDIT_MATCH_WINDOW_MS) {
+  const { sha256 } = redactOutboundText(request.message || '');
+  return events.find((event) => event.phase === 'attempted'
+    && event.origin === request.origin
+    && event.target?.id === request.target?.id
+    && event.message_sha256 === sha256
+    && Math.abs(now - Date.parse(event.occurred_at)) <= windowMs);
+}
+
+// An audit requirement that degrades to best-effort is indistinguishable from no
+// audit at all, which is exactly how ten sends from one pane went unrecorded. If
+// the hook did not run, refuse rather than send without a record.
+export async function assertAudited(request, options = {}) {
+  const environment = options.env || process.env;
+  if (environment.HERDR_SHEPHERD_ALLOW_UNAUDITED === '1') return { audited: false, bypassed: true };
+  const stateDir = options.stateDir || defaultStateDir(environment);
+  const events = await listAuditEvents(stateDir);
+  const match = findAuditedAttempt(events, request, options.now ?? Date.now(), options.auditWindowMs);
+  if (match) return { audited: true, bypassed: false, sequence: match.sequence };
+  throw new Error(
+    `refusing to send unaudited: no "attempted" audit event for this request exists in ${stateDir}. `
+    + 'The PreToolUse hook did not run, so this send would leave no record of who sent what. '
+    + 'Confirm the herdr-shepherd plugin hooks are active in this session; a session whose hook '
+    + 'loading failed audits nothing and gives no other warning. '
+    + 'Set HERDR_SHEPHERD_ALLOW_UNAUDITED=1 to send anyway and accept an unaudited mutation.',
+  );
+}
 
 function agentStatus(stdout) {
   try {
@@ -135,10 +184,20 @@ async function stdin() {
   return Buffer.concat(chunks).toString('utf8');
 }
 
+export async function runCli(options = {}) {
+  const argv = options.argv || process.argv;
+  if (!argv.includes('--stdin')) throw new Error('use --stdin with a JSON coordination request');
+  // Validation first, so a malformed request reports the field it is missing
+  // rather than an audit failure it cannot act on.
+  const request = validateCoordinationRequest(JSON.parse(options.input ?? (await stdin())));
+  const audit = await assertAudited(request, options);
+  const result = await executeCoordinationRequest(request, options);
+  const identity = `${WRAPPER_MARKER}: ${await wrapperIdentity()}${audit.bypassed ? ' audit=bypassed' : ''}`;
+  return { ...result, stdout: `${identity}\n${result.stdout}` };
+}
+
 async function main() {
-  if (!process.argv.includes('--stdin')) throw new Error('use --stdin with a JSON coordination request');
-  const request = JSON.parse(await stdin());
-  const result = await executeCoordinationRequest(request);
+  const result = await runCli();
   if (result.stdout) process.stdout.write(result.stdout);
   if (result.stderr) process.stderr.write(result.stderr);
   process.exitCode = result.exitCode;

@@ -38,14 +38,23 @@ function deny(reason) {
 function outcome(payload) {
   const value = payload.tool_response ?? payload.tool_result ?? payload.error ?? '';
   const text = typeof value === 'string' ? value : JSON.stringify(value);
+  // Markers are read from un-encoded output when the response is structured. On
+  // the stringified form a Windows path separator is indistinguishable from the
+  // backslash of a JSON escape, which truncates the value at the first segment.
+  const streams = [value?.stdout, value?.stderr].filter((stream) => typeof stream === 'string');
+  const markers = typeof value === 'string' ? value : (streams.join('\n') || text);
   const failed = payload.hook_event_name === 'PostToolUseFailure'
     || /"(?:exit_code|exitCode)"\s*:\s*[1-9]/.test(text)
     || /(?:^|\s)(?:error|failed):/i.test(text);
-  const delivery = text.match(/coordination-delivery:\s*(confirmed|unconfirmed|queued|unknown)/)?.[1];
+  const delivery = markers.match(/coordination-delivery:\s*(confirmed|unconfirmed|queued|unknown)/)?.[1];
+  // Records which wrapper actually performed the send, so a stale path or a
+  // superseded plugin copy is attributable after the fact.
+  const wrapper = markers.match(/coordination-wrapper:\s*([^\r\n]+)/)?.[1]?.trim();
   return {
     phase: failed ? 'failed' : 'succeeded',
     summary: redactOutboundText(text.slice(0, 1000)).redacted,
     delivery,
+    wrapper,
   };
 }
 
@@ -192,6 +201,7 @@ export async function handleHookPayload(payload, options = {}) {
       phase: result.phase,
       outcome_summary: result.summary,
       ...(result.delivery ? { delivery: result.delivery } : {}),
+      ...(result.wrapper ? { wrapper: result.wrapper } : {}),
     });
   }
   return {};

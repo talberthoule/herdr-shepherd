@@ -118,6 +118,44 @@ test('post success and failure append outcome phases', async () => {
   }
 });
 
+test('the outcome event records which wrapper performed the send', async () => {
+  const dir = await stateDir();
+  // A Windows path is the case that matters: its separators must not be read as
+  // JSON escapes and truncate the recorded value.
+  const identity = 'herdr-shepherd 0.1.0 (C:\\plugins\\shepherd\\node\\scripts\\coordinate.mjs)';
+  await handleHookPayload({
+    hook_event_name: 'PostToolUse', tool_name: 'Bash', tool_use_id: 'wrapper-identity',
+    tool_input: { command: posixCommandFor(request) },
+    tool_response: { stdout: `coordination-wrapper: ${identity}\ncoordination-delivery: confirmed\n`, exitCode: 0 },
+  }, { runtime: 'claude-code', stateDir: dir, launchViewer: false });
+  const event = (await listAuditEvents(dir)).at(-1);
+  assert.equal(event.phase, 'succeeded');
+  assert.equal(event.delivery, 'confirmed');
+  assert.equal(event.wrapper, identity);
+});
+
+test('wrapper identity is also recovered from a plain-string tool response', async () => {
+  const dir = await stateDir();
+  await handleHookPayload({
+    hook_event_name: 'PostToolUse', tool_name: 'Bash', tool_use_id: 'wrapper-identity-string',
+    tool_input: { command: posixCommandFor(request) },
+    tool_response: 'coordination-wrapper: herdr-shepherd 0.1.0 (/opt/h/scripts/coordinate.mjs)\ncoordination-delivery: queued\n',
+  }, { runtime: 'claude-code', stateDir: dir, launchViewer: false });
+  const event = (await listAuditEvents(dir)).at(-1);
+  assert.equal(event.wrapper, 'herdr-shepherd 0.1.0 (/opt/h/scripts/coordinate.mjs)');
+  assert.equal(event.delivery, 'queued');
+});
+
+test('an outcome without a wrapper marker omits the field rather than guessing', async () => {
+  const dir = await stateDir();
+  await handleHookPayload({
+    hook_event_name: 'PostToolUse', tool_name: 'Bash', tool_use_id: 'silent-wrapper',
+    tool_input: { command: posixCommandFor(request) },
+    tool_response: JSON.stringify({ stdout: '', exitCode: 0 }),
+  }, { runtime: 'claude-code', stateDir: dir, launchViewer: false });
+  assert.equal('wrapper' in (await listAuditEvents(dir)).at(-1), false);
+});
+
 test('secret-bearing wrapper request is denied without storing the secret', async () => {
   const dir = await stateDir();
   const secret = 'token=ghp_1234567890abcdefghijklmnopqrstuvwxyz';

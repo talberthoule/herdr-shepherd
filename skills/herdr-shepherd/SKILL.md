@@ -116,7 +116,7 @@ Proactive coordination may only request `herdr agent send` for an existing agent
 
 A direct user request may authorize broader Herdr actions. Mark those `user-directed`; they remain audited but do not auto-open the viewer.
 
-Every mutation must use the audited wrapper. Read [references/command-policy.md](references/command-policy.md) before the first mutation in a turn. Raw Herdr mutations are denied by the profile hook.
+Every mutation must use the audited wrapper. Read [references/command-policy.md](references/command-policy.md) before the first mutation in a turn. Raw Herdr mutations are denied by the profile hook, and the wrapper refuses to send at all when it cannot confirm the hook audited the attempt.
 
 ## Coordination Transport Reliability
 
@@ -223,10 +223,21 @@ Keep the JSON on one line and do not append a pipe or redirect to the heredoc; t
 
 ### Read the failure, do not guess it
 
-A successful send prints `coordination-delivery: <verdict>`. Two failures are easy to confuse, and the wrapper now names which one it hit:
+A successful send prints two lines: `coordination-wrapper: <name> <version> (<path>)` identifying which wrapper ran, then `coordination-delivery: <verdict>`. **No output at all means the wrapper never executed** — a path or environment problem, never a delivery verdict. Silence is not success.
+
+Three failures are easy to confuse, and the wrapper names which one it hit:
 
 - `target agent does not exist: <id>` — the CLI resolved the pane as absent. Re-snapshot; the pane id is wrong or gone.
 - `could not reach Herdr to verify <id>: ...` — the control socket dropped the probe after a retry. **The target is probably live.** Confirm with `herdr agent get <id>` and send again. Do not conclude that coordination is down, and do not record that conclusion anywhere durable.
+- `refusing to send unaudited: ...` — the PreToolUse hook did not run, so the send would leave no record. This is an auditing failure, not a transport one; the target is fine. See below.
+
+### When the audit hook is not running
+
+The wrapper requires proof that it was audited: the hook writes an `attempted` event *before* the command runs, so a matching event must already exist by the time the wrapper starts. If it does not, the wrapper refuses the send rather than mutating without a record.
+
+This is load-bearing, not defensive. One pane ran ten coordination sends with the hook silently not loaded; seven delivered with no audit entry anywhere, and nothing distinguished that pane from an audited one. An audit that fails open is indistinguishable from an audit that passes.
+
+On the refusal: confirm the skill's hooks are actually active in this session rather than assuming they are, since a session whose hook loading failed audits nothing and gives no other warning. A fresh pane is the usual fix. `HERDR_SHEPHERD_ALLOW_UNAUDITED=1` sends anyway and marks the output `audit=bypassed`; use it only when the user has accepted an unaudited mutation, never to make an inconvenient refusal go away.
 
 The hook records attempted and outcome events, redacts obvious secrets, and opens one loopback audit viewer tab per viewer process for proactive sends. The viewer defaults to the `succeeded` phase, which it displays as **sent**: the wrapper typed the message and pressed Enter, which is not proof the target submitted or read it. Treat the viewer as a record of what was attempted, and confirm delivery by pane read. Use **Viewed & close** to acknowledge; closing the tab alone leaves entries unseen and keeps the viewer process available for later updates.
 
@@ -251,6 +262,8 @@ The hook records attempted and outcome events, redacts obvious secrets, and open
 - Do not claim a submitted prompt started an agent turn until a later status read shows the agent working.
 - Do not place credentials in coordination messages. The wrapper blocks obvious secrets.
 - Do not put literal `Herdr <word>` prose *unquoted* inside unrelated shell command bodies. Quoted arguments are treated as data, so `grep "herdr agent send" log` is fine, but the classifier still scans unquoted text and heredoc bodies and may read prose there as a raw Herdr mutation. Quote the text or pass it another way.
+- Do not read wrapper silence as success. Every real run prints `coordination-wrapper:`; no output means the wrapper never started, so nothing was sent.
+- Do not assume your session is being audited. Verify that a send produced an `attempted` event before trusting the trail, and never reach for `HERDR_SHEPHERD_ALLOW_UNAUDITED=1` to clear a refusal the user has not accepted.
 - Do not report a failed status probe as a missing target. `could not reach Herdr to verify <id>` is a transport fault on the control socket; the pane is probably live. Confirm with `herdr agent get <id>` and retry rather than declaring coordination down.
 - Do not trust a remembered wrapper path. Resolve `coordinate.mjs` per session; a plugin update moves it and the stale path fails with `Cannot find module`, which reads like a coordination outage but is not one.
 - Do not conclude the coordination channel is down from one class of failure. The existence gate runs only for `proactive`, so `user-directed` sends can be delivering normally at the same moment proactive sends fail. Test both before reporting an outage.
