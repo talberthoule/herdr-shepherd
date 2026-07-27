@@ -64,6 +64,21 @@ test('quoted prose mentioning Herdr is data, not an invocation', () => {
   assert.equal(classifyShellCommand('echo "run herdr agent send later" > notes.txt').kind, 'other');
 });
 
+test('a stray apostrophe cannot mask a real mutation', () => {
+  // The lone apostrophe in "don't" pairs with the one opening 'x', so a naive
+  // mask swallows the mutation between them and the command reads as inert.
+  assert.equal(
+    classifyShellCommand("echo don't && herdr pane close w2:p1 && echo 'x'").kind,
+    'raw-mutation',
+  );
+  assert.equal(
+    classifyShellCommand('echo "agent\'s pane" ; herdr agent send w2:p1 go ; echo \'y\'').kind,
+    'raw-mutation',
+  );
+  // Prose without a command separator is still masked, which is the whole point.
+  assert.equal(classifyShellCommand("git commit -m 'document herdr pane close'").kind, 'other');
+});
+
 test('masking quoted arguments does not open a bypass', () => {
   // A string handed to an interpreter really does execute what it contains.
   assert.equal(classifyShellCommand('bash -c "herdr pane close w2:p1"').kind, 'raw-mutation');

@@ -35,10 +35,17 @@ export function defaultStateDir(environment = process.env, platform = process.pl
 // interpreter to execute, which really does run what it contains.
 const SHELL_INTERPRETER = /(?:^|[\s;&|(])(?:eval|exec|bash|sh|zsh|dash|ksh|pwsh|powershell(?:\.exe)?|cmd(?:\.exe)?|Invoke-Expression|iex)\b(?:\s+-{1,2}[A-Za-z-]+)*\s*$/i;
 
+// An unbalanced apostrophe earlier in the command - `don't`, `agent's` - can pair
+// with a later quote and swallow everything between them, mutation included. A
+// span holding a command separator is therefore treated as spurious pairing and
+// left unmasked, so the classifier still sees whatever it contains.
+const SPANS_COMMANDS = /(?:&&|\|\||[;|])/;
+
 export function maskQuotedArguments(command = '') {
   const text = String(command);
   return text.replace(/(["'])((?:\\.|(?!\1)[^\\])*)\1/g, (match, quote, inner, offset) => {
     if (SHELL_INTERPRETER.test(text.slice(0, offset))) return ` ${inner} `;
+    if (SPANS_COMMANDS.test(inner)) return match;
     const executable = inner.match(/(?:^|[\\/])(herdr(?:\.exe)?)$/i);
     return executable ? ` ${executable[1]} ` : ' ';
   });
