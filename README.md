@@ -74,6 +74,8 @@ Audit state stays on your machine:
 - Linux: `${XDG_STATE_HOME:-$HOME/.local/state}/Herdr/shepherd-audit`
 - Runtime override: `HERDR_SHEPHERD_STATE_DIR`
 
+The wrapper will not send unless it can find the hook's own record of the attempt, so a session whose hooks failed to load is blocked rather than silently unaudited. Each run also prints `coordination-wrapper: <name> <version> (<path>)`, which makes no output mean the wrapper never executed. `HERDR_SHEPHERD_ALLOW_UNAUDITED=1` overrides the requirement and marks the output `audit=bypassed`; it exists for direct invocation outside a hooked session, not for clearing a refusal.
+
 ## Manual Install
 
 Manual install is useful when plugin marketplaces are unavailable or when testing a local checkout.

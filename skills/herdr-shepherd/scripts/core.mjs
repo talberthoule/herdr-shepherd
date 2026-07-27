@@ -28,9 +28,33 @@ export function defaultStateDir(environment = process.env, platform = process.pl
   return path.join(base, 'Herdr', 'shepherd-audit');
 }
 
+// A quoted string is an argument, not a command, so prose that merely mentions
+// Herdr must not read as an invocation - otherwise `grep "Herdr mutations"` and
+// `echo "... herdr candidates ..."` are denied as raw mutations. Two things must
+// still survive masking: a quoted path to the binary, and a string handed to an
+// interpreter to execute, which really does run what it contains.
+const SHELL_INTERPRETER = /(?:^|[\s;&|(])(?:eval|exec|bash|sh|zsh|dash|ksh|pwsh|powershell(?:\.exe)?|cmd(?:\.exe)?|Invoke-Expression|iex)\b(?:\s+-{1,2}[A-Za-z-]+)*\s*$/i;
+
+// An unbalanced apostrophe earlier in the command - `don't`, `agent's` - can pair
+// with a later quote and swallow everything between them, mutation included. A
+// span holding a command separator is therefore treated as spurious pairing and
+// left unmasked, so the classifier still sees whatever it contains.
+const SPANS_COMMANDS = /(?:&&|\|\||[;|])/;
+
+export function maskQuotedArguments(command = '') {
+  const text = String(command);
+  return text.replace(/(["'])((?:\\.|(?!\1)[^\\])*)\1/g, (match, quote, inner, offset) => {
+    if (SHELL_INTERPRETER.test(text.slice(0, offset))) return ` ${inner} `;
+    if (SPANS_COMMANDS.test(inner)) return match;
+    const executable = inner.match(/(?:^|[\\/])(herdr(?:\.exe)?)$/i);
+    return executable ? ` ${executable[1]} ` : ' ';
+  });
+}
+
 export function classifyShellCommand(command = '') {
   if (/coordinate\.mjs\b[\s\S]*--stdin/i.test(command)) return { kind: 'wrapper' };
-  const match = command.match(/(?:^|[\s;&|])(?:["'][^"']*[\\/])?herdr(?:\.exe)?["']?\s+([a-z-]+)(?:\s+([a-z-]+))?/i);
+  const match = maskQuotedArguments(command)
+    .match(/(?:^|[\s;&|])(?:["'][^"']*[\\/])?herdr(?:\.exe)?["']?\s+([a-z-]+)(?:\s+([a-z-]+))?/i);
   if (!match) return { kind: 'other' };
   const operation = `${match[1].toLowerCase()} ${String(match[2] || '').toLowerCase()}`.trim();
   return { kind: READ_COMMANDS.has(operation) ? 'read' : 'raw-mutation', operation };
