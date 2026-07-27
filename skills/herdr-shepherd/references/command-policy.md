@@ -36,6 +36,12 @@ Read-only commands such as `api snapshot`, `pane read`, and `agent list` are not
 
 Quoted arguments are treated as data, so prose that merely names the product does not read as an invocation. Unquoted text and heredoc bodies are still scanned, and a string passed to an interpreter such as `bash -c` is classified by what it would execute.
 
+### Scope of the classifier
+
+The classifier is a guardrail against running a raw mutation by accident, not a sandbox against a determined bypass. It reads one command's text, so it cannot follow a mutation that reaches the shell indirectly — assigned to a variable and expanded later, built by string concatenation, or handed to a tool that executes it out of band. Those forms pass as inert.
+
+This is a deliberate trade for a defect that caused real harm in the other direction: matching the product name followed by any word anywhere in the command text denied ordinary read-only investigation, including a `grep` for the hook's own denial message. Do not treat a classification of inert as permission; the obligation to route mutations through the audited wrapper is on the agent, and the audit-enforcement check below is what actually catches an unrecorded send.
+
 ## Audit enforcement
 
 The hook records the `attempted` phase before the command runs, so the wrapper can verify its own coverage. If no matching `attempted` event exists when the wrapper starts, the hook did not run and the wrapper refuses the send with `refusing to send unaudited`. The check matches on origin, target id, and the message SHA-256 within a recent window; a request repeated verbatim inside that window can be vouched for by the earlier attempt.

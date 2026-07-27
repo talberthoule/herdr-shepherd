@@ -15,9 +15,14 @@ const ACTIVE_STATUS = new Set(['working', 'busy', 'running']);
 export const DELIVERY_MARKER = 'coordination-delivery';
 export const WRAPPER_MARKER = 'coordination-wrapper';
 // The hook writes its `attempted` event before the command runs, so a matching
-// event must already exist by the time this process starts. The window only has
-// to cover hook execution, which includes a viewer launch on the proactive path.
-export const AUDIT_MATCH_WINDOW_MS = 120_000;
+// event must already exist by the time this process starts. Detection does not
+// depend on this window at all - a hook that never ran writes nothing, ever - so
+// the window is only a guard against an ancient attempt vouching for a new send.
+// It is deliberately generous: the harness can wait on a user permission
+// decision between the hook and the command, and a slow approval must not read
+// as a missing audit. A stale vouch requires an identical origin, target, and
+// message, which is close to harmless; a false refusal blocks coordination.
+export const AUDIT_MATCH_WINDOW_MS = 900_000;
 
 // Silence must mean exactly one thing: the wrapper never ran. Every run
 // therefore names which wrapper ran and from where, so a stale path or a

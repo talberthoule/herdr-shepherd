@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
-import { mkdtemp, readFile } from 'node:fs/promises';
+import { mkdtemp } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -15,7 +15,7 @@ import {
   runCli,
   wrapperIdentity,
 } from '../skills/herdr-shepherd/scripts/coordinate.mjs';
-import { appendAuditEvent, redactOutboundText } from '../skills/herdr-shepherd/scripts/core.mjs';
+import { appendAuditEvent, listAuditEvents, redactOutboundText } from '../skills/herdr-shepherd/scripts/core.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const fakeHerdr = join(here, 'fake-herdr.mjs');
@@ -88,6 +88,17 @@ test('an attempt for a different target does not vouch for this send', async () 
   await assert.rejects(() => assertAudited(request(), { stateDir: dir, env: {} }), /refusing to send unaudited/i);
 });
 
+test('a slow permission approval does not read as a missing audit', async () => {
+  // The hook records the attempt, then the harness can sit waiting on a user
+  // decision before the command runs. A human taking minutes to approve must
+  // not turn an audited send into a refusal.
+  const dir = await stateDir();
+  const event = await seedAttempt(dir);
+  const afterApproval = Date.parse(event.occurred_at) + 5 * 60_000;
+  const result = await assertAudited(request(), { stateDir: dir, env: {}, now: afterApproval });
+  assert.equal(result.audited, true);
+});
+
 test('a stale attempt outside the window does not vouch for this send', async () => {
   const dir = await stateDir();
   const event = await seedAttempt(dir);
@@ -101,8 +112,7 @@ test('a stale attempt outside the window does not vouch for this send', async ()
 test('findAuditedAttempt ignores outcome phases', async () => {
   const dir = await stateDir();
   await seedAttempt(dir, { phase: 'succeeded' });
-  const events = JSON.parse(`[${(await readFile(join(dir, 'audit.jsonl'), 'utf8')).trim().split(/\r?\n/).join(',')}]`);
-  assert.equal(findAuditedAttempt(events, request()), undefined);
+  assert.equal(findAuditedAttempt(await listAuditEvents(dir), request()), undefined);
 });
 
 test('the wrapper names itself and where it ran from', async () => {
