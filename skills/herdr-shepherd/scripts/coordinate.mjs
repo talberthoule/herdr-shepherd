@@ -27,6 +27,36 @@ export function deliveryVerdict(before, after) {
   return ACTIVE_STATUS.has(after) ? 'confirmed' : 'unconfirmed';
 }
 
+// The control socket drops a probe intermittently, surfacing as a BrokenPipe
+// exit rather than a CLI-level error. Reporting that as a missing target sends
+// the caller hunting for a pane that is in fact live, so the two are separated:
+// only the CLI's own agent_not_found is a settled answer about the target.
+function probeFailureKind({ stderr }) {
+  try {
+    const code = JSON.parse(stderr).error?.code;
+    if (code) return /_not_found$/.test(code) ? 'missing' : 'transport';
+  } catch { /* not the structured CLI error; fall through to text matching */ }
+  return /\bnot found\b/i.test(stderr) ? 'missing' : 'transport';
+}
+
+function probeDetail({ exitCode, stderr }) {
+  const first = stderr.trim().split(/\r?\n/)[0];
+  return first ? first.slice(0, 200) : `exit code ${exitCode} with no diagnostics`;
+}
+
+// A transport fault is worth one more try; a missing target never is.
+async function probeAgent(probe, options = {}) {
+  const attempts = Math.max(1, options.probeAttempts ?? 2);
+  let result;
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    result = await probe();
+    if (result.exitCode === 0) return { result, failure: null };
+    if (probeFailureKind(result) === 'missing') return { result, failure: 'missing' };
+    if (attempt < attempts) await wait(options.probeRetryDelayMs ?? 150);
+  }
+  return { result, failure: 'transport' };
+}
+
 function run(command, args, env) {
   return new Promise((resolvePromise, reject) => {
     const child = spawn(command, args, { env, windowsHide: true });
@@ -53,8 +83,16 @@ export async function executeCoordinationRequest(request, options = {}) {
   // and must not trigger a second round trip.
   let probedBefore = false;
   if (request.origin === 'proactive') {
-    const check = await run(command, [...prefixArgs, 'agent', 'get', request.target.id], env);
-    if (check.exitCode !== 0) throw new Error(`target agent does not exist: ${request.target.id}`);
+    const probe = () => run(command, [...prefixArgs, 'agent', 'get', request.target.id], env);
+    const { result: check, failure } = await probeAgent(probe, options);
+    if (failure === 'missing') throw new Error(`target agent does not exist: ${request.target.id}`);
+    if (failure) {
+      throw new Error(
+        `could not reach Herdr to verify ${request.target.id}: ${probeDetail(check)}. `
+        + 'This is a transport fault, not a missing target — the pane may well be live. '
+        + `Confirm with \`herdr agent get ${request.target.id}\` and retry the send.`,
+      );
+    }
     statusBefore = agentStatus(check.stdout);
     probedBefore = true;
   }
@@ -67,9 +105,12 @@ export async function executeCoordinationRequest(request, options = {}) {
     }
     const source = sourceLabel ? `"${String(sourceLabel).replace(/\s+/g, ' ').trim()}" (${sourcePane})` : sourcePane || 'another session';
     const text = `[Herdr from ${source}] ${request.message}`;
+    // Retried for the same reason as the proactive gate, but never fatal here:
+    // an unresolved status degrades the verdict to unknown rather than blocking
+    // a send the caller is already authorized to make.
     if (!probedBefore) {
-      const probe = await run(command, [...prefixArgs, 'agent', 'get', request.target.id], env);
-      statusBefore = agentStatus(probe.stdout);
+      const before = await probeAgent(() => run(command, [...prefixArgs, 'agent', 'get', request.target.id], env), options);
+      statusBefore = agentStatus(before.result.stdout);
     }
     const typed = await run(command, [...prefixArgs, 'pane', 'send-text', request.target.id, text], env);
     if (typed.exitCode !== 0) return typed;
@@ -81,8 +122,8 @@ export async function executeCoordinationRequest(request, options = {}) {
     // same as the target submitting them. Probe the status so the audit trail
     // records a delivery verdict instead of implying one.
     await wait(options.deliveryProbeDelayMs ?? 1500);
-    const after = await run(command, [...prefixArgs, 'agent', 'get', request.target.id], env);
-    const verdict = deliveryVerdict(statusBefore, agentStatus(after.stdout));
+    const after = await probeAgent(() => run(command, [...prefixArgs, 'agent', 'get', request.target.id], env), options);
+    const verdict = deliveryVerdict(statusBefore, agentStatus(after.result.stdout));
     return { ...submitted, stdout: `${submitted.stdout}\n${DELIVERY_MARKER}: ${verdict}\n` };
   }
   return run(command, [...prefixArgs, ...request.args], env);

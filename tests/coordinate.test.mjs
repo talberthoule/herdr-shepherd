@@ -86,6 +86,66 @@ test('missing proactive target prevents the send', async () => {
   assert.deepEqual(calls, [['agent', 'get', 'w2:p1']]);
 });
 
+test('structured agent_not_found is settled and is not retried', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'fake-herdr-'));
+  const log = join(dir, 'calls.jsonl');
+  await assert.rejects(() => executeCoordinationRequest(request(), {
+    command: process.execPath,
+    prefixArgs: [fakeHerdr],
+    env: { ...process.env, FAKE_HERDR_LOG: log, FAKE_HERDR_MISSING_JSON: '1' },
+    probeRetryDelayMs: 0,
+  }), /target agent does not exist/i);
+  const calls = (await readFile(log, 'utf8')).trim().split(/\r?\n/).map(JSON.parse);
+  assert.deepEqual(calls, [['agent', 'get', 'w2:p1']], 'a missing target must not be probed twice');
+});
+
+test('a transient transport fault is retried and the send proceeds', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'fake-herdr-'));
+  const log = join(dir, 'calls.jsonl');
+  const result = await executeCoordinationRequest(request(), {
+    command: process.execPath,
+    prefixArgs: [fakeHerdr],
+    env: {
+      ...process.env,
+      FAKE_HERDR_LOG: log,
+      FAKE_HERDR_TRANSPORT_FAILURES: '1',
+      HERDR_PANE_ID: 'w1:pE',
+      HERDR_TAB_ID: '',
+    },
+    inputDelayMs: 0,
+    deliveryProbeDelayMs: 0,
+    probeRetryDelayMs: 0,
+  });
+  assert.equal(result.exitCode, 0);
+  const calls = (await readFile(log, 'utf8')).trim().split(/\r?\n/).map(JSON.parse);
+  assert.deepEqual(calls, [
+    ['agent', 'get', 'w2:p1'],
+    ['agent', 'get', 'w2:p1'],
+    ['pane', 'send-text', 'w2:p1', '[Herdr from w1:pE] Resume the official installer build.'],
+    ['pane', 'send-keys', 'w2:p1', 'enter'],
+    ['agent', 'get', 'w2:p1'],
+  ]);
+});
+
+test('a persistent transport fault is not reported as a missing target', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'fake-herdr-'));
+  const log = join(dir, 'calls.jsonl');
+  await assert.rejects(() => executeCoordinationRequest(request(), {
+    command: process.execPath,
+    prefixArgs: [fakeHerdr],
+    env: { ...process.env, FAKE_HERDR_LOG: log, FAKE_HERDR_TRANSPORT_FAILURES: '99' },
+    probeRetryDelayMs: 0,
+  }), (error) => {
+    assert.doesNotMatch(error.message, /does not exist/i, 'a transport fault must not accuse the target');
+    assert.match(error.message, /transport fault, not a missing target/i);
+    assert.match(error.message, /BrokenPipe/, 'the underlying CLI diagnostic must survive');
+    return true;
+  });
+  const calls = (await readFile(log, 'utf8')).trim().split(/\r?\n/).map(JSON.parse);
+  assert.equal(calls.length, 2, 'the probe is retried exactly once before giving up');
+  assert.ok(calls.every((call) => call[1] === 'get'), 'no send may follow a failed gate');
+});
+
 test('user-directed requests can execute broader Herdr operations', async () => {
   const value = request('user-directed');
   value.args = ['tab', 'focus', 'w2:t1'];

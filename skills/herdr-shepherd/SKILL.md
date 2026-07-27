@@ -191,21 +191,42 @@ This acknowledgement is a coordination convention, not proof of transport delive
 
 ## Example
 
-After snapshot and pane-read show that `w2:p1` owns a paused installer build, run a single PowerShell command containing literal JSON:
+### Locate the wrapper first
+
+`coordinate.mjs` ships with the skill, so its path depends on the runtime and install. **Resolve it at first use in a session instead of trusting a remembered path** — a plugin update or reorganization moves it, and the stale path fails mid-session with `Cannot find module`, which looks nothing like a coordination problem:
+
+| Install | Wrapper path |
+|---|---|
+| Claude Code plugin | `~/.claude/plugins/cache/<marketplace>/herdr-shepherd/<version>/skills/herdr-shepherd/scripts/coordinate.mjs` |
+| Codex plugin | `~/.codex/plugins/herdr-shepherd/skills/herdr-shepherd/scripts/coordinate.mjs` |
+| Manual skill install | `<skill root>/scripts/coordinate.mjs` |
+
+The version segment changes on update, so glob for `**/coordinate.mjs` under the runtime's config directory rather than pinning one. Do not use a junction or symlink path such as `~/.claude/skills/...`; those intermittently fail to resolve for the Windows node process, and because the hook only audits and never delivers, a node that fails to start means nothing was sent.
+
+### Send
+
+After snapshot and pane-read show that `w2:p1` owns a paused installer build, pipe one literal JSON object to the wrapper. Under Claude Code use the Bash tool with a quoted heredoc — the PowerShell tool's string-to-native pipe prepends a UTF-8 BOM that breaks `--stdin` JSON parsing:
+
+```sh
+node "<wrapper path>" --stdin <<'JSON'
+{"origin":"proactive","action":"herdr.exec","args":["agent","send","w2:p1","Resume the official installer build and report blockers here."],"target":{"type":"agent","id":"w2:p1"},"reason":"Continue paused work without duplicating it","message":"Resume the official installer build and report blockers here."}
+JSON
+```
+
+Keep the JSON on one line and do not append a pipe or redirect to the heredoc; the hook rejects both. Where PowerShell is the only shell available, use a single-quoted here-string:
 
 ```powershell
 @'
 {"origin":"proactive","action":"herdr.exec","args":["agent","send","w2:p1","Resume the official installer build and report blockers here."],"target":{"type":"agent","id":"w2:p1"},"reason":"Continue paused work without duplicating it","message":"Resume the official installer build and report blockers here."}
-'@ | node "$HOME\.codex\skills\herdr-shepherd\scripts\coordinate.mjs" --stdin
+'@ | node "<wrapper path>" --stdin
 ```
 
-On Linux, use the same literal JSON through a quoted heredoc:
+### Read the failure, do not guess it
 
-```sh
-node "$HOME/.codex/skills/herdr-shepherd/scripts/coordinate.mjs" --stdin <<'JSON'
-{"origin":"proactive","action":"herdr.exec","args":["agent","send","w2:p1","Resume the official installer build and report blockers here."],"target":{"type":"agent","id":"w2:p1"},"reason":"Continue paused work without duplicating it","message":"Resume the official installer build and report blockers here."}
-JSON
-```
+A successful send prints `coordination-delivery: <verdict>`. Two failures are easy to confuse, and the wrapper now names which one it hit:
+
+- `target agent does not exist: <id>` — the CLI resolved the pane as absent. Re-snapshot; the pane id is wrong or gone.
+- `could not reach Herdr to verify <id>: ...` — the control socket dropped the probe after a retry. **The target is probably live.** Confirm with `herdr agent get <id>` and send again. Do not conclude that coordination is down, and do not record that conclusion anywhere durable.
 
 The hook records attempted and outcome events, redacts obvious secrets, and opens one loopback audit viewer tab per viewer process for proactive sends. The viewer defaults to the `succeeded` phase, which it displays as **sent**: the wrapper typed the message and pressed Enter, which is not proof the target submitted or read it. Treat the viewer as a record of what was attempted, and confirm delivery by pane read. Use **Viewed & close** to acknowledge; closing the tab alone leaves entries unseen and keeps the viewer process available for later updates.
 
@@ -229,7 +250,10 @@ The hook records attempted and outcome events, redacts obvious secrets, and open
 - Do not repeat work merely because another agent is idle; read its pane and stage a handoff when relevant.
 - Do not claim a submitted prompt started an agent turn until a later status read shows the agent working.
 - Do not place credentials in coordination messages. The wrapper blocks obvious secrets.
-- Do not put literal `Herdr <word>` prose inside unrelated shell command bodies; the hook scans complete command text and may classify it as a raw Herdr mutation. Reword or pass the text another way.
+- Do not put literal `Herdr <word>` prose *unquoted* inside unrelated shell command bodies. Quoted arguments are treated as data, so `grep "herdr agent send" log` is fine, but the classifier still scans unquoted text and heredoc bodies and may read prose there as a raw Herdr mutation. Quote the text or pass it another way.
+- Do not report a failed status probe as a missing target. `could not reach Herdr to verify <id>` is a transport fault on the control socket; the pane is probably live. Confirm with `herdr agent get <id>` and retry rather than declaring coordination down.
+- Do not trust a remembered wrapper path. Resolve `coordinate.mjs` per session; a plugin update moves it and the stale path fails with `Cannot find module`, which reads like a coordination outage but is not one.
+- Do not conclude the coordination channel is down from one class of failure. The existence gate runs only for `proactive`, so `user-directed` sends can be delivering normally at the same moment proactive sends fail. Test both before reporting an outage.
 - Do not `checkout`, `checkout -b`, `merge`, or `stash` in a shared working tree before confirming who holds it — you will sweep another agent's uncommitted work onto your branch.
 - Do not park on `main` in a worktree. It blocks the tree-holder's merge, and nothing tells you that you did it.
 - Do not create a worktree inside a cloud-synced folder. The sync client breaks its `.git` pointer file, and uncommitted work in it becomes unrecoverable.

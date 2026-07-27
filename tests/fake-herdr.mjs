@@ -10,13 +10,28 @@ if (process.env.FAKE_HERDR_KEYS_FAILURE && args[0] === 'pane' && args[1] === 'se
   process.stderr.write('send keys failed\n');
   process.exit(1);
 }
+const priorGets = () => readFileSync(process.env.FAKE_HERDR_LOG, 'utf8')
+  .trim().split(/\r?\n/).map(JSON.parse)
+  .filter((call) => call[0] === 'agent' && call[1] === 'get').length;
+
+// The real CLI reports a genuinely absent target as structured JSON on stderr.
+if (process.env.FAKE_HERDR_MISSING_JSON && args[0] === 'agent' && args[1] === 'get') {
+  process.stderr.write(`${JSON.stringify({
+    error: { code: 'agent_not_found', message: `agent target ${args[2]} not found` },
+    id: 'cli:agent:get',
+  })}\n`);
+  process.exit(1);
+}
+// Transient control-socket fault: fails the first N probes, then recovers.
+if (process.env.FAKE_HERDR_TRANSPORT_FAILURES && args[0] === 'agent' && args[1] === 'get'
+  && priorGets() <= Number(process.env.FAKE_HERDR_TRANSPORT_FAILURES)) {
+  process.stderr.write('Error: Os { code: 232, kind: BrokenPipe, message: "The pipe is being closed." }\n');
+  process.exit(1);
+}
 // Statuses are consumed in call order so a test can script "idle then working".
 if (args[0] === 'agent' && args[1] === 'get' && process.env.FAKE_HERDR_STATUSES) {
   const statuses = process.env.FAKE_HERDR_STATUSES.split(',');
-  const priorGets = readFileSync(process.env.FAKE_HERDR_LOG, 'utf8')
-    .trim().split(/\r?\n/).map(JSON.parse)
-    .filter((call) => call[0] === 'agent' && call[1] === 'get').length;
-  const status = statuses[Math.min(priorGets - 1, statuses.length - 1)];
+  const status = statuses[Math.min(priorGets() - 1, statuses.length - 1)];
   process.stdout.write(
     status === 'none'
       ? JSON.stringify({ result: {} })

@@ -2,7 +2,7 @@
 
 ## Request contract
 
-Pipe one literal JSON object in a single-quoted PowerShell here-string directly to `scripts/coordinate.mjs --stdin`.
+Pipe one literal JSON object directly to `scripts/coordinate.mjs --stdin`, through a quoted POSIX heredoc or a single-quoted PowerShell here-string. Under Claude Code the heredoc via the Bash tool is required: the PowerShell tool's string-to-native pipe prepends a UTF-8 BOM that breaks `--stdin` JSON parsing. Keep the JSON on one line, and do not append a pipe or redirect to the heredoc — the hook rejects both. Resolve the wrapper's own path per session rather than reusing a pinned one; see the Example in SKILL.md.
 
 | Field | Required | Value |
 |---|---:|---|
@@ -14,6 +14,17 @@ Pipe one literal JSON object in a single-quoted PowerShell here-string directly 
 | `message` | yes | Outbound text, or an empty string for actions without text |
 
 For `proactive`, `args` must be exactly `['agent', 'send', targetId, message]`; `target` and `message` must match those arguments. The wrapper verifies the agent exists, prefixes the source tab/pane for the recipient, types the message, and sends Enter after a short delay. A successful audit outcome means submission to the pane, not proof that the agent started a new turn.
+
+## Probe failures
+
+The existence check runs only for `proactive`; `user-directed` is authorized by the user and is not gated on it. Two distinct failures must not be conflated, because only the first says anything about the target:
+
+| Error | Meaning | Response |
+|---|---|---|
+| `target agent does not exist: <id>` | The CLI resolved the pane as absent. | Re-snapshot; the id is wrong or gone. |
+| `could not reach Herdr to verify <id>: <diagnostic>` | The control socket dropped the probe, and a retry also failed. | The pane is probably live. Confirm with `herdr agent get <id>` and send again. |
+
+The wrapper retries a transport fault once before reporting it and preserves the CLI's own diagnostic in the message. A transport fault is not evidence that coordination is down: `user-directed` sends bypass this gate entirely and may be delivering normally at the same time.
 
 For `user-directed`, broader Herdr arguments are permitted because the user supplied the authority. Never relabel an agent-initiated action as user-directed.
 

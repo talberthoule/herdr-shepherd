@@ -55,6 +55,25 @@ test('raw Herdr mutations are denied while the audited wrapper is recognized', (
   assert.equal(classifyShellCommand("@'\n{}\n'@ | node C:\\skill\\coordinate.mjs --stdin").kind, 'wrapper');
 });
 
+test('quoted prose mentioning Herdr is data, not an invocation', () => {
+  // Both of these were denied in the field: the second means an agent could not
+  // grep for the hook's own denial message.
+  assert.equal(classifyShellCommand('echo "=== PATH herdr candidates ==="').kind, 'other');
+  assert.equal(classifyShellCommand('grep -c "Raw Herdr mutations are blocked" session.jsonl').kind, 'other');
+  assert.equal(classifyShellCommand("git commit -m 'document herdr pane close semantics'").kind, 'other');
+  assert.equal(classifyShellCommand('echo "run herdr agent send later" > notes.txt').kind, 'other');
+});
+
+test('masking quoted arguments does not open a bypass', () => {
+  // A string handed to an interpreter really does execute what it contains.
+  assert.equal(classifyShellCommand('bash -c "herdr pane close w2:p1"').kind, 'raw-mutation');
+  assert.equal(classifyShellCommand('sh -c \'herdr agent send w2:p1 "go"\'').kind, 'raw-mutation');
+  assert.equal(classifyShellCommand('powershell.exe -Command "herdr pane close w2:p1"').kind, 'raw-mutation');
+  // A quoted path to the binary is still an invocation of it.
+  assert.equal(classifyShellCommand('"C:\\Program Files\\Herdr\\bin\\herdr.exe" pane close w2:p1').kind, 'raw-mutation');
+  assert.equal(classifyShellCommand('"/opt/herdr/bin/herdr" api snapshot').kind, 'read');
+});
+
 test('proactive requests may only send to an existing agent', () => {
   const valid = {
     origin: 'proactive',
