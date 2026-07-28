@@ -98,6 +98,33 @@ function probeDetail({ exitCode, stderr }) {
   return first ? first.slice(0, 200) : `exit code ${exitCode} with no diagnostics`;
 }
 
+// The keystroke transport is the field-tested default; agent-prompt is the
+// replacement under live verification (docs/agent-prompt-live-verification.md).
+// It submits text and encoded Enter in one CLI call honoring the pane's
+// bracketed-paste mode, so the composer race the keystroke path works around
+// does not exist on it.
+const TRANSPORTS = new Set(['keystrokes', 'agent-prompt']);
+
+function resolveTransport(options, env) {
+  const transport = options.transport || env.HERDR_SHEPHERD_TRANSPORT || 'keystrokes';
+  if (!TRANSPORTS.has(transport)) {
+    throw new Error(`unknown coordination transport: ${transport} (expected keystrokes or agent-prompt)`);
+  }
+  return transport;
+}
+
+// Assumption pending live verification: a `--wait` that expires exits nonzero
+// with a timeout diagnostic while the prompt itself has already submitted.
+// Both the structured code and the text fallback are asserted only against
+// fake-herdr; the live checklist records what the real CLI prints.
+function isWaitTimeout({ stderr }) {
+  try {
+    const code = JSON.parse(stderr).error?.code;
+    if (code) return /timeout|timed_out/.test(code);
+  } catch { /* not the structured CLI error; fall through to text matching */ }
+  return /\btimed?[ _-]?out\b/i.test(stderr);
+}
+
 // A transport fault is worth one more try; a missing target never is.
 async function probeAgent(probe, options = {}) {
   const attempts = Math.max(1, options.probeAttempts ?? 2);
@@ -132,6 +159,7 @@ export async function executeCoordinationRequest(request, options = {}) {
   const command = options.command || process.env.HERDR_BIN || (process.platform === 'win32' ? 'herdr.exe' : 'herdr');
   const prefixArgs = options.prefixArgs || [];
   const env = options.env || process.env;
+  const transport = resolveTransport(options, env);
   let statusBefore = null;
   // Tracked separately from statusBefore: an unparseable probe is still a probe,
   // and must not trigger a second round trip.
@@ -166,9 +194,34 @@ export async function executeCoordinationRequest(request, options = {}) {
       const before = await probeAgent(() => run(command, [...prefixArgs, 'agent', 'get', request.target.id], env), options);
       statusBefore = agentStatus(before.result.stdout);
     }
+    if (transport === 'agent-prompt') {
+      // One call submits text plus encoded Enter, so there is no composer race
+      // and no typed-Enter follow-up. When the target started idle, `--wait
+      // --until working` folds the delivery probe into the same request: the
+      // server reports the idle->working transition itself, which also catches
+      // a turn that starts and finishes faster than a fixed post-send probe.
+      // A target already mid-turn gets no wait - it is already `working`, so
+      // the wait would trivially pass without proving this prompt submitted;
+      // that stays `queued`, same as the keystroke taxonomy.
+      const idle = statusBefore !== null && !ACTIVE_STATUS.has(statusBefore);
+      const waitArgs = idle
+        ? ['--wait', '--until', 'working', '--timeout', String(options.promptWaitTimeoutMs ?? 5000)]
+        : [];
+      const submitted = await run(command, [...prefixArgs, 'agent', 'prompt', request.target.id, text, ...waitArgs], env);
+      if (submitted.exitCode !== 0) {
+        // An expired wait is a delivery question, not a failed send: the prompt
+        // submitted and the target did not start within the window. Anything
+        // else is returned as the failure it is.
+        if (!idle || !isWaitTimeout(submitted)) return submitted;
+        return { ...submitted, exitCode: 0, stdout: `${submitted.stdout}\n${DELIVERY_MARKER}: unconfirmed\n` };
+      }
+      const verdict = statusBefore === null ? 'unknown' : (idle ? 'confirmed' : 'queued');
+      return { ...submitted, stdout: `${submitted.stdout}\n${DELIVERY_MARKER}: ${verdict}\n` };
+    }
     const typed = await run(command, [...prefixArgs, 'pane', 'send-text', request.target.id, text], env);
     if (typed.exitCode !== 0) return typed;
-    // ponytail: fixed gap avoids Herdr/Codex's paste/Enter race; remove when pane run submits reliably.
+    // ponytail: fixed gap avoids Herdr/Codex's paste/Enter race; the agent-prompt
+    // transport above is the replacement, opt-in until live-verified.
     await wait(options.inputDelayMs ?? 100);
     const submitted = await run(command, [...prefixArgs, 'pane', 'send-keys', request.target.id, 'enter'], env);
     if (submitted.exitCode !== 0) return submitted;
