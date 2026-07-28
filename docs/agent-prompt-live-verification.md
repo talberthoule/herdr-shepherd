@@ -1,5 +1,27 @@
 # agent-prompt transport: live verification checklist
 
+## Live results — 2026-07-28, Herdr 0.7.2-preview.2026-07-07, protocol 16
+
+Run end to end from a live coordinator pane (w4:p4) against a same-workspace Claude pane and
+a disposable scratch agent, every mutation through the audited wrapper as `user-directed`.
+
+| Question | Result |
+|---|---|
+| `agent prompt` exists? | **No.** Not in this build's CLI. The upstream docs describe a newer CLI. The `agent` usage text points at the replacement: "agent send writes literal text; use pane run when you want command text plus Enter." |
+| `pane run` submits atomically? | **Yes.** Idle Claude composer: full text landed as one submitted prompt, target replied, composer left empty. No paste/Enter race observed. |
+| Busy target | **Queues cleanly.** A `pane run` mid-turn was held and submitted as its own turn immediately after the running turn finished. Nothing merged, interleaved, or lost. |
+| Long / multi-line payloads | **Intact.** ~1700-character, 12-line message delivered and submitted as one message; head and tail markers both echoed back. The 1024-char head-truncation is a keystroke-race artifact, not a transport property. |
+| `agent wait --status X` | **Event-driven and correct** — resolves exit 0 with `agent_info` the moment the state arrives, and immediately if the state is already true. |
+| `agent wait --timeout` | **Broken.** Ignored entirely; the command blocks until the state arrives (observed 4+ minutes past an 8s flag). Bounded waits need a wrapper-side watchdog, which `run(..., timeoutMs)` now provides. |
+| Send into a `blocked` pane | **Dangerous — worse than documented.** The typed Enter answered the pending AskUserQuestion modal with its default option and the message text was discarded. A send into a blocked pane silently takes a decision on the user's behalf. The wrapper now refuses when the pre-send status is `blocked`, on every transport. |
+| Unsubmitted composer draft | **Stomped by merge-and-submit.** `pane run` against a composer holding a draft submitted draft+message concatenated as one message — it force-submits the user's incomplete thought. `pane read` shows the composer line, so a pre-send read can detect a dirty composer; suppressing chatter toward user-facing panes remains justified. |
+| Send→wait race | **Real.** A 2-second turn started and finished before a separately-issued wait began, leaving the wait hanging on a `working` that had already passed. The pane-run transport falls back to one status read after the watchdog, and treats idle→done as confirmed. |
+| Audit / hook flow | **Unchanged.** Every wrapper call produced paired attempted/succeeded events with source, target, reason, and message SHA-256. |
+
+Consequence: the `pane-run` transport in `coordinate.mjs` is the verified replacement on this
+build; `agent-prompt` below remains the intended upgrade once the newer CLI ships. The original
+checklist follows for re-verification against future builds.
+
 The wrapper's `agent-prompt` transport (opt-in via `HERDR_SHEPHERD_TRANSPORT=agent-prompt` or
 `options.transport`) replaces the keystroke send path — `pane send-text`, fixed delay, `pane
 send-keys enter` — with one `herdr agent prompt` call. Herdr documents the call as atomically

@@ -98,12 +98,14 @@ function probeDetail({ exitCode, stderr }) {
   return first ? first.slice(0, 200) : `exit code ${exitCode} with no diagnostics`;
 }
 
-// The keystroke transport is the field-tested default; agent-prompt is the
-// replacement under live verification (docs/agent-prompt-live-verification.md).
-// It submits text and encoded Enter in one CLI call honoring the pane's
-// bracketed-paste mode, so the composer race the keystroke path works around
-// does not exist on it.
-const TRANSPORTS = new Set(['keystrokes', 'agent-prompt']);
+// The keystroke transport is the field-tested default. pane-run is its
+// live-verified replacement on Herdr 0.7.2-preview: one `pane run` call
+// submits text plus Enter atomically (verified: no composer race, multi-line
+// >1500-char payloads intact, busy targets queue cleanly - see
+// docs/agent-prompt-live-verification.md). agent-prompt targets the newer CLI
+// documented upstream that folds submit and delivery-wait into one request;
+// it does not exist in 0.7.2-preview.
+const TRANSPORTS = new Set(['keystrokes', 'pane-run', 'agent-prompt']);
 
 function resolveTransport(options, env) {
   const transport = options.transport || env.HERDR_SHEPHERD_TRANSPORT || 'keystrokes';
@@ -138,18 +140,22 @@ async function probeAgent(probe, options = {}) {
   return { result, failure: 'transport' };
 }
 
-function run(command, args, env) {
+// timeoutMs is a wrapper-side watchdog: `agent wait --timeout` is not honored
+// in Herdr 0.7.2-preview (verified live - the CLI blocks until the state
+// arrives, hours past its flag), so a bounded wait must be enforced here.
+function run(command, args, env, timeoutMs) {
   return new Promise((resolvePromise, reject) => {
-    const child = spawn(command, args, { env, windowsHide: true });
+    const child = spawn(command, args, { env, windowsHide: true, ...(timeoutMs ? { timeout: timeoutMs } : {}) });
     const stdout = [];
     const stderr = [];
     child.stdout.on('data', (chunk) => stdout.push(chunk));
     child.stderr.on('data', (chunk) => stderr.push(chunk));
     child.once('error', reject);
-    child.once('close', (exitCode) => resolvePromise({
+    child.once('close', (exitCode, signal) => resolvePromise({
       exitCode: exitCode ?? 1,
       stdout: Buffer.concat(stdout).toString('utf8'),
       stderr: Buffer.concat(stderr).toString('utf8'),
+      timedOut: Boolean(signal && timeoutMs),
     }));
   });
 }
@@ -193,6 +199,47 @@ export async function executeCoordinationRequest(request, options = {}) {
     if (!probedBefore) {
       const before = await probeAgent(() => run(command, [...prefixArgs, 'agent', 'get', request.target.id], env), options);
       statusBefore = agentStatus(before.result.stdout);
+    }
+    // Verified live: a send into a blocked pane does not sit in the composer.
+    // The typed Enter answers the pending prompt with its default option and
+    // the message text is discarded - the send silently takes a decision on
+    // the user's behalf. Refuse on every transport; deliberate modal
+    // interaction must use explicit send-keys, never a message send.
+    if (statusBefore === 'blocked') {
+      throw new Error(
+        `refusing to send: ${request.target.id} is blocked on user input. `
+        + 'A send would answer its pending prompt with the default option and discard the message. '
+        + 'Resolve the prompt (or have the user answer it), then resend.',
+      );
+    }
+    if (transport === 'pane-run') {
+      // One `pane run` call submits text plus Enter atomically, so there is no
+      // composer race and no separate typed Enter. The delivery verdict is
+      // event-driven: `agent wait --status working` resolves the moment the
+      // target starts (or immediately if it already started), bounded by a
+      // wrapper-side watchdog because the CLI flag is broken on this build.
+      const submitted = await run(command, [...prefixArgs, 'pane', 'run', request.target.id, text], env);
+      if (submitted.exitCode !== 0) return submitted;
+      if (statusBefore === null || ACTIVE_STATUS.has(statusBefore)) {
+        const verdict = statusBefore === null ? 'unknown' : 'queued';
+        return { ...submitted, stdout: `${submitted.stdout}\n${DELIVERY_MARKER}: ${verdict}\n` };
+      }
+      const waited = await run(
+        command, [...prefixArgs, 'agent', 'wait', request.target.id, '--status', 'working'],
+        env, options.deliveryWaitTimeoutMs ?? 5000,
+      );
+      if (waited.exitCode === 0) {
+        return { ...submitted, stdout: `${submitted.stdout}\n${DELIVERY_MARKER}: confirmed\n` };
+      }
+      // A short turn can start and finish inside the watchdog window, leaving
+      // the wait hanging on a `working` that already passed. One status read
+      // disambiguates the fresh-pane case: idle only reaches done by running
+      // a turn. done-before to done-after stays honestly unconfirmed.
+      const after = await probeAgent(() => run(command, [...prefixArgs, 'agent', 'get', request.target.id], env), options);
+      const statusAfter = agentStatus(after.result.stdout);
+      const verdict = ACTIVE_STATUS.has(statusAfter) || (statusBefore === 'idle' && statusAfter === 'done')
+        ? 'confirmed' : 'unconfirmed';
+      return { ...submitted, stdout: `${submitted.stdout}\n${DELIVERY_MARKER}: ${verdict}\n` };
     }
     if (transport === 'agent-prompt') {
       // One call submits text plus encoded Enter, so there is no composer race
