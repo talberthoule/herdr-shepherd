@@ -98,17 +98,17 @@ function probeDetail({ exitCode, stderr }) {
   return first ? first.slice(0, 200) : `exit code ${exitCode} with no diagnostics`;
 }
 
-// The keystroke transport is the field-tested default. pane-run is its
-// live-verified replacement on Herdr 0.7.2-preview: one `pane run` call
-// submits text plus Enter atomically (verified: no composer race, multi-line
-// >1500-char payloads intact, busy targets queue cleanly - see
-// docs/agent-prompt-live-verification.md). agent-prompt targets the newer CLI
-// documented upstream that folds submit and delivery-wait into one request;
-// it does not exist in 0.7.2-preview.
+// pane-run is the live-verified default on Herdr 0.7.2-preview: one `pane run`
+// call submits text plus Enter atomically (verified: no composer race,
+// multi-line >1500-char payloads intact, busy targets queue cleanly - see
+// docs/agent-prompt-live-verification.md). keystrokes is the legacy typed
+// text + delayed Enter path, kept as an opt-in fallback. agent-prompt targets
+// the newer CLI documented upstream that folds submit and delivery-wait into
+// one request; it does not exist in 0.7.2-preview.
 const TRANSPORTS = new Set(['keystrokes', 'pane-run', 'agent-prompt']);
 
 function resolveTransport(options, env) {
-  const transport = options.transport || env.HERDR_SHEPHERD_TRANSPORT || 'keystrokes';
+  const transport = options.transport || env.HERDR_SHEPHERD_TRANSPORT || 'pane-run';
   if (!TRANSPORTS.has(transport)) {
     throw new Error(`unknown coordination transport: ${transport} (expected keystrokes or agent-prompt)`);
   }

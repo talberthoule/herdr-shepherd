@@ -112,7 +112,7 @@ Long-running loops are the main source of duplicated effort, and **labels lie** 
 
 ## Mutation Boundary
 
-Proactive coordination may only request `herdr agent send` for an existing agent. The audited wrapper prefixes the source tab/pane, types the message, and sends Enter after a short delay, so report it as sent; a later status read is still required before claiming the agent resumed. Do not proactively start agents, run other pane commands, focus UI, close panes, rename items, or alter layout.
+Proactive coordination may only request `herdr agent send` for an existing agent. The audited wrapper prefixes the source tab/pane, submits the message atomically, and records a delivery verdict; only a `confirmed` verdict or a later pane read supports claiming the agent resumed. Do not proactively start agents, run other pane commands, focus UI, close panes, rename items, or alter layout.
 
 A direct user request may authorize broader Herdr actions. Mark those `user-directed`; they remain audited but do not auto-open the viewer.
 
@@ -120,18 +120,19 @@ Every mutation must use the audited wrapper. Read [references/command-policy.md]
 
 ## Coordination Transport Reliability
 
-A send is keystrokes typed into the target composer plus a delayed Enter, so delivery races the target pane's input state. The race is lost most often when the target is busy — mid-turn, clearing its conversation, or sitting in an unfocused workspace. Field-tested rules:
+A send submits the message into the target agent's session in one atomic `pane run` call — text plus Enter together, honoring the pane's bracketed-paste mode — and the wrapper derives a delivery verdict from the target's status stream. Multi-line and long payloads arrive intact on this transport; what stays uncertain is the target's state, not the typing. Field-tested rules:
 
-1. The wrapper types the `message` field verbatim. Never put a placeholder there; `args` must mirror `message` exactly.
-2. Keep sends compact — well under 1000 characters including the source prefix. A long send that loses the composer race arrives with its first 1024 characters dropped, cut mid-word with the source prefix gone, and a short send that loses the same race can vanish outright. Put details in the shared tracker and reference issue or comment IDs instead of inlining them.
-3. Number multi-point sends (part 1/2, part 2/2) so truncation is detectable. On receiving a truncated part, recover the full text from the sender's session log before acting, and say so in the ACK.
-4. The typed Enter can be swallowed by the target pane's TUI state (a modal or paused prompt), leaving the message stuck in the composer. After every send, verify within about 20 seconds that the target flips to working or shows the text processing; if not, re-send — the fresh Enter submits the stuck composer. Sweep panes for stuck composers on each coordination wake.
-5. Pane read is ground truth; ACKs arrive out of order and go stale. When correcting a mis-assignment, make the corrective message the last word in every affected queue, then verify convergence by pane read, not ACK.
-6. Verify claimed branches and commits in git before acting on any branch-ready claim.
-7. Do not reply to ACKs of ACKs.
-8. Inbound sends stomp any in-progress typing in the target composer, including the user's, so suppress unsolicited routine chatter toward user-facing coordinator panes — lanes volunteer only substantive events (branch- or patch-ready with sha, verdicts, blockers, decision questions). A message explicitly marked ACK-requested still requires a compact ACK: silence cannot prove delivery, because a stuck composer is indistinguishable from understood. The sender owns delivery recovery — wait about 20 seconds, then pane read, then resend — so a human pressing Enter is never the fallback. Broadcast protocol changes with an explicit do-not-acknowledge marker so the change itself does not trigger an ACK storm.
-9. The wrapper probes the target's agent status before and shortly after each send and records the verdict in the audit trail, so delivery is assessed even when nobody checks. `confirmed` means an idle target started working, which is the only state that proves the Enter submitted. `unconfirmed` means an idle target stayed idle — suspect a stuck composer, pane read and resend. `queued` means the target was already working, so a real delivery and a stuck composer are indistinguishable; pane read later rather than resending blind. `unknown` means the probe itself failed. Only `confirmed` may be treated as delivered.
-10. An ACK proves the recipient holds the content, not that your send delivered it. A capable recipient may pull the content by pane read while your message sits unsubmitted in its composer, so an ACK can arrive from a send that never landed. Confirm submission by pane read: text still visible in the composer, or a queue hint such as `tab to queue message`, means unsubmitted. Once the recipient has already acted on the content, do not resend to flush its stuck composer — the fresh Enter submits a duplicate of work already done. Have the user clear it instead.
+1. The wrapper submits the `message` field verbatim. Never put a placeholder there; `args` must mirror `message` exactly. Keep sends compact regardless of transport: write substance to the durable record first and send the pointer.
+2. The wrapper probes the target's status before the send and resolves the verdict event-driven afterward, recording it in the audit trail so delivery is assessed even when nobody checks. `confirmed` means an idle target started working, which is the only state that proves the submit landed. `queued` means the target was already working; the message queued behind the running turn, so pane read later to confirm it surfaced. `unconfirmed` means the target did not start within the wait window — pane read before resending. `unknown` means the probe itself failed. Only `confirmed` may be treated as delivered.
+3. Never send to a `blocked` target, and do not work around the wrapper's refusal: verified live, the submit's Enter answers the pane's pending prompt with its default option and the message text is discarded — the send silently takes a decision on the user's behalf. Resolve the prompt first; deliberate modal interaction is explicit `send-keys`, never a message send.
+4. A send merges with an unsubmitted composer draft and force-submits both as one message. Pane read shows the composer line, so check it before sending to a user-facing pane, and suppress unsolicited routine chatter toward user-facing coordinator panes — lanes volunteer only substantive events (branch- or patch-ready with sha, verdicts, blockers, decision questions).
+5. A message explicitly marked ACK-requested still requires a compact ACK: a `queued` verdict cannot distinguish delivered from still-pending, and silence proves nothing. The sender owns delivery recovery — verdict first, then pane read, then resend — so a human pressing Enter is never the fallback. Broadcast protocol changes with an explicit do-not-acknowledge marker so the change itself does not trigger an ACK storm.
+6. Pane read is ground truth; ACKs arrive out of order and go stale. When correcting a mis-assignment, make the corrective message the last word in every affected queue, then verify convergence by pane read, not ACK.
+7. Verify claimed branches and commits in git before acting on any branch-ready claim.
+8. Do not reply to ACKs of ACKs.
+9. An ACK proves the recipient holds the content, not that your send delivered it: a capable recipient may pull the content by pane read before your message surfaces. Once the recipient has already acted on the content, do not resend after an `unconfirmed` verdict — the second submit starts a duplicate turn over work already done. Pane read first.
+10. Do not shell a bare `agent wait` and trust `--timeout`; the flag is ignored on 0.7.2-preview and the command blocks until the state arrives. The wrapper bounds its own delivery wait with a watchdog — bound yours the same way.
+11. Legacy keystroke transport only (`HERDR_SHEPHERD_TRANSPORT=keystrokes`, typed text plus a delayed Enter): the send races the target composer. A long send that loses the race arrives with its first 1024 characters dropped, so number multi-point sends (part 1/2, part 2/2) and recover truncated text from the sender's session log; the typed Enter can be swallowed by TUI state, leaving the message stuck in the composer — verify within about 20 seconds and resend, and sweep panes for stuck composers on each coordination wake. On that transport a stuck composer is indistinguishable from understood.
 
 ## Routing Substance and Pointers
 
@@ -239,7 +240,7 @@ This is load-bearing, not defensive. One pane ran ten coordination sends with th
 
 On the refusal: confirm the skill's hooks are actually active in this session rather than assuming they are, since a session whose hook loading failed audits nothing and gives no other warning. A fresh pane is the usual fix. `HERDR_SHEPHERD_ALLOW_UNAUDITED=1` sends anyway and marks the output `audit=bypassed`; use it only when the user has accepted an unaudited mutation, never to make an inconvenient refusal go away.
 
-The hook records attempted and outcome events, redacts obvious secrets, and opens one loopback audit viewer tab per viewer process for proactive sends. The viewer defaults to the `succeeded` phase, which it displays as **sent**: the wrapper typed the message and pressed Enter, which is not proof the target submitted or read it. Treat the viewer as a record of what was attempted, and confirm delivery by pane read. Use **Viewed & close** to acknowledge; closing the tab alone leaves entries unseen and keeps the viewer process available for later updates.
+The hook records attempted and outcome events, redacts obvious secrets, and opens one loopback audit viewer tab per viewer process for proactive sends. The viewer defaults to the `succeeded` phase, which it displays as **sent**: the wrapper submitted the message, which is not proof the target read or acted on it. Treat the viewer as a record of what was attempted, and confirm delivery by the recorded verdict and pane read. Use **Viewed & close** to acknowledge; closing the tab alone leaves entries unseen and keeps the viewer process available for later updates.
 
 ## Quick Reference
 
@@ -252,7 +253,7 @@ The hook records attempted and outcome events, redacts obvious secrets, and open
 | Share findings, verdicts, or decisions | Write to the durable record, then send its ID |
 | No durable record bound yet | Run Durable Record Setup before relying on pointer sends |
 | Perform user-requested mutation | Audited wrapper with `origin: user-directed` |
-| Inspect audit | Viewer opens one tab per viewer process after proactive sends, defaults to the `succeeded` phase shown as **sent** (typed, not confirmed delivered), shows newest events first, and supports deleting one action or all history |
+| Inspect audit | Viewer opens one tab per viewer process after proactive sends, defaults to the `succeeded` phase shown as **sent** (submitted; the recorded verdict says whether delivery was confirmed), shows newest events first, and supports deleting one action or all history |
 
 ## Common Mistakes
 
@@ -273,7 +274,10 @@ The hook records attempted and outcome events, redacts obvious secrets, and open
 - Do not blame the sync client for a locked worktree. "Permission denied" or "Device or resource busy" almost always means a shell still has it as its working directory — usually your own, from an earlier inspection. Check whether `.git` is actually missing first.
 - Do not read an empty `git -C <dir> status` as a clean worktree. On a broken worktree the command fails and prints nothing, so counting output lines scores it identical to clean. Check the command succeeded before trusting the result.
 - Do not rely on a submitted `agent send` to stop an imminent collision. It is a queued message, not an interrupt. Escalate time-critical conflicts to the user.
-- Do not inline long payloads in a send. A send that races a busy composer arrives head-truncated; keep sends compact, number multi-part sends, and verify delivery by pane read.
+- Do not send to a `blocked` pane, and do not work around the wrapper's refusal. The submit's Enter answers the pending prompt with its default option and discards your message — it takes a decision on the user's behalf.
+- Do not send to a pane whose composer holds an unsubmitted draft. The send merges with the draft and force-submits both as one message; pane read shows the composer line, so check it first.
+- Do not trust `agent wait --timeout`; the flag is ignored and the command blocks until the state arrives. Bound waits with your own watchdog, as the wrapper does.
+- Do not inline long payloads in a send even though the default transport delivers them intact. Substance belongs in the durable record; the legacy keystroke transport still head-truncates at 1024 characters.
 - Do not judge overlap by tab label. Read the other agent's plan; near-identical work often hides behind different names.
 - Do not treat a dirty worktree alone as proof of parallel work.
 - Do not treat an ACK as proof your send was submitted. The recipient may have pulled the content by pane read while your message sat unsubmitted.

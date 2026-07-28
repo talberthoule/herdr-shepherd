@@ -98,12 +98,12 @@ test('an unknown transport is refused before any Herdr call', async () => {
   );
 });
 
-test('the default transport remains keystrokes until agent-prompt is live-verified', async () => {
+test('the default transport is the live-verified pane-run', async () => {
   const { calls } = await execute(
-    { FAKE_HERDR_STATUSES: 'idle,idle' },
-    { transport: undefined, inputDelayMs: 0, deliveryProbeDelayMs: 0 },
+    { FAKE_HERDR_STATUSES: 'idle' },
+    { transport: undefined },
   );
   assert.deepEqual(calls.map((call) => `${call[0]} ${call[1]}`), [
-    'agent get', 'pane send-text', 'pane send-keys', 'agent get',
+    'agent get', 'pane run', 'agent wait',
   ]);
 });

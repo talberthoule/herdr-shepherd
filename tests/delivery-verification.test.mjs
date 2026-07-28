@@ -32,6 +32,7 @@ async function send(statuses) {
   const result = await executeCoordinationRequest(request(), {
     command: process.execPath,
     prefixArgs: [fakeHerdr],
+    transport: 'keystrokes',
     env: { ...process.env, FAKE_HERDR_LOG: log, FAKE_HERDR_STATUSES: statuses, HERDR_PANE_ID: 'w1:pE' },
     inputDelayMs: 0,
     deliveryProbeDelayMs: 0,
@@ -73,6 +74,7 @@ test('a failed Enter skips the probe and reports the failure', async () => {
   const result = await executeCoordinationRequest(request(), {
     command: process.execPath,
     prefixArgs: [fakeHerdr],
+    transport: 'keystrokes',
     env: {
       ...process.env,
       FAKE_HERDR_LOG: log,
@@ -111,7 +113,7 @@ test('viewer renders the delivery verdict with its own explanation', async () =>
     'utf8',
   );
   assert.match(viewer, /DELIVERY_TITLE=\{[^}]*unconfirmed:/);
-  assert.match(viewer, /Suspect a stuck composer/);
+  assert.match(viewer, /suspect a stuck composer/);
   assert.match(viewer, /dl-'\+esc\(e\.delivery\)/);
 });
 
@@ -120,5 +122,5 @@ test('skill documents the delivery verdicts', async () => {
   for (const verdict of ['confirmed', 'unconfirmed', 'queued', 'unknown']) {
     assert.match(skill, new RegExp(`\`${verdict}\``), `missing "${verdict}" verdict`);
   }
-  assert.match(skill, /probes the target's agent status before and shortly after/);
+  assert.match(skill, /probes the target's status before the send/);
 });
