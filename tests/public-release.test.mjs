@@ -114,6 +114,33 @@ test('retired product state identity appears only in migration history', async (
   }
 });
 
+test('CLAUDE.md and AGENTS.md point at the skill instead of copying it', async () => {
+  // The doctrine has exactly one home. These files carry a link and this
+  // repository's own facts; a second copy is what the three-file sync tax was.
+  const headings = [
+    '## Stacking Work Across Lanes',
+    '## Merge Train Coordination',
+    '## Agent Status as a Coordination Signal',
+    '## Coordination Transport Reliability',
+    '## Routing Substance and Pointers',
+    '## Durable Record Setup',
+  ];
+  for (const path of ['CLAUDE.md', 'AGENTS.md']) {
+    const content = await readFile(join(root, path), 'utf8');
+    for (const heading of headings) {
+      assert.ok(!content.includes(heading), `${path} has re-grown the mirrored section "${heading}"`);
+    }
+    assert.ok(
+      content.includes('skills/herdr-shepherd/SKILL.md'),
+      `${path} must link the skill it defers to`,
+    );
+    assert.ok(
+      content.includes('.herdr-shepherd.json'),
+      `${path} must point at the durable-record binding rather than restating it`,
+    );
+  }
+});
+
 test('the skill package stands alone without CLAUDE.md or AGENTS.md', async () => {
   // Those files are this repository's own convention. The installers and both
   // plugin manifests must never reference them, or the skill would depend on a

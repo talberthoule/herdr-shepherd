@@ -7,7 +7,6 @@ import test from 'node:test';
 const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, '..');
 const skillPath = join(root, 'skills', 'herdr-shepherd', 'SKILL.md');
-const mirrorPaths = [join(root, 'AGENTS.md'), join(root, 'CLAUDE.md')];
 
 const routingHeading = '## Routing Substance and Pointers';
 const setupHeading = '## Durable Record Setup';
@@ -113,23 +112,4 @@ test('skill describes the viewer label honestly', async () => {
   assert.doesNotMatch(skill, /The viewer defaults to succeeded events\./);
 });
 
-test('AGENTS.md and CLAUDE.md mirror the new sections verbatim', async () => {
-  const skill = await readFile(skillPath, 'utf8');
-  for (const heading of [routingHeading, setupHeading]) {
-    const canonical = extractSection(skill, heading);
-    for (const path of mirrorPaths) {
-      const mirrored = extractSection(await readFile(path, 'utf8'), heading);
-      assert.equal(mirrored, canonical, `${path} "${heading}" drifted from SKILL.md`);
-    }
-  }
-});
 
-test('mirror preambles name every mirrored section', async () => {
-  for (const path of mirrorPaths) {
-    const raw = (await readFile(path, 'utf8')).replaceAll('\r\n', '\n');
-    const preamble = raw.slice(0, raw.indexOf('\n## '));
-    for (const name of ['Routing Substance and Pointers', 'Durable Record Setup']) {
-      assert.ok(preamble.includes(name), `${path} preamble omits "${name}"`);
-    }
-  }
-});

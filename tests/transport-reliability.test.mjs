@@ -7,7 +7,6 @@ import test from 'node:test';
 const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, '..');
 const skillPath = join(root, 'skills', 'herdr-shepherd', 'SKILL.md');
-const mirrorPaths = [join(root, 'AGENTS.md'), join(root, 'CLAUDE.md')];
 
 const heading = '## Coordination Transport Reliability';
 
@@ -49,10 +48,3 @@ test('skill documents coordination transport reliability', async () => {
   assert.doesNotMatch(section, /treat silence as understood/);
 });
 
-test('AGENTS.md and CLAUDE.md mirror the transport reliability section verbatim', async () => {
-  const canonical = extractSection(await readFile(skillPath, 'utf8'));
-  for (const path of mirrorPaths) {
-    const mirrored = extractSection(await readFile(path, 'utf8'));
-    assert.equal(mirrored, canonical, `${path} transport reliability section drifted from SKILL.md`);
-  }
-});
