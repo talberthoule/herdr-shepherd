@@ -66,7 +66,12 @@ test('skill walks the user through binding a durable record when none exists', a
   assert.match(section, /Prove it round-trips/);
   assert.match(section, /An unverified binding is not a durable record/);
   assert.match(section, /Record the binding where future agents will read it/);
-  assert.match(section, /a binding held only in one session is not configured/);
+  assert.match(section, /[Aa] binding held only in one session is not configured/);
+  // The binding must not depend on files most projects never adopt: the skill
+  // ships SKILL.md and its scripts, never CLAUDE.md or AGENTS.md.
+  assert.match(section, /committed `\.herdr-shepherd\.json` at the repo root/);
+  assert.match(section, /runtime-neutral/);
+  assert.match(section, /never require those files or create them for this purpose/);
   assert.match(section, /Report what was created/);
   assert.match(section, /Treat missing credentials as a stop, not a workaround/);
 });

@@ -1,0 +1,9 @@
+{
+  "record": {
+    "system": "linear",
+    "container": "project Herdr (team Alpha)",
+    "id_format": "ALP-<number>",
+    "url": "https://linear.app/alpha-h/project/herdr-7377e1cad6d1",
+    "notes": "Durable coordination record. Findings, verdicts, decisions and their rationale, blockers, plans, and status go here; send pointers referencing the issue ID. Keep ACKs, liveness, and lane claims out of it. One shared credential authors every issue, so put agent attribution in the body."
+  }
+}

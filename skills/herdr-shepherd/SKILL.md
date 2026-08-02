@@ -210,7 +210,13 @@ When a repository has no durable record bound yet, establish one before relying 
    - A shared file at a stable absolute path — last resort; durable only on one machine, so say so.
 3. **Walk the signup and configuration** for the chosen option rather than handing over a link. Confirm the workspace or repository, create or identify the container (project, label, or directory), and confirm the naming convention for records.
 4. **Prove it round-trips** before declaring it ready: write one probe record, read it back by ID, then delete or clearly mark the probe. An unverified binding is not a durable record.
-5. **Record the binding where future agents will read it** — the repo's `CLAUDE.md` or `AGENTS.md`, naming the system, the exact container, and the ID format. This is what makes the choice survive context loss; a binding held only in one session is not configured.
+5. **Record the binding where future agents will read it** — a committed `.herdr-shepherd.json` at the repo root, naming the system, the exact container, and the ID format:
+
+   ```json
+   {"record": {"system": "linear", "container": "project Herdr (team Alpha)", "id_format": "ALP-<number>", "url": "https://linear.app/…"}}
+   ```
+
+   Committed, so it travels with the repo and survives context loss, and runtime-neutral, so a Codex session and a Claude session resolve the same binding. Where a project already keeps agent instructions in `CLAUDE.md` or `AGENTS.md`, a mirrored line there is welcome — but never require those files or create them for this purpose, because most projects do not use them and the binding must not depend on a convention the project has not adopted. A binding held only in one session is not configured.
 6. **Report what was created**, including anything the user now owns externally (a new account, project, or label), so nothing external appears without their knowledge.
 
 Treat missing credentials as a stop, not a workaround: ask the user to authenticate rather than downgrading to a less durable tier on their behalf.
