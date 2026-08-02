@@ -50,6 +50,7 @@ test('an idle target submits atomically and the wait resolves the verdict', asyn
   assert.match(result.stdout, new RegExp(`${DELIVERY_MARKER}: confirmed`));
   assert.deepEqual(calls, [
     ['agent', 'get', 'w2:p1'],
+    ['agent', 'explain', 'w2:p1', '--json'],
     ['pane', 'run', 'w2:p1', TEXT],
     ['agent', 'wait', 'w2:p1', '--status', 'working'],
   ], 'submit is one call and the verdict is the wait resolving, not a sleep-and-probe');
@@ -59,14 +60,15 @@ test('a working target is recorded as queued without a wait', async () => {
   const { result, calls } = await execute({ FAKE_HERDR_STATUSES: 'working' });
   assert.equal(result.exitCode, 0);
   assert.match(result.stdout, new RegExp(`${DELIVERY_MARKER}: queued`));
-  assert.equal(calls.length, 2, 'waiting for working on a working target proves nothing');
+  assert.equal(calls.length, 3, 'waiting for working on a working target proves nothing');
+  assert.ok(!calls.some((call) => call[1] === 'wait'));
 });
 
 test('an unresolved before-status still submits and reports unknown', async () => {
   const { result, calls } = await execute({ FAKE_HERDR_STATUSES: 'none' });
   assert.equal(result.exitCode, 0);
   assert.match(result.stdout, new RegExp(`${DELIVERY_MARKER}: unknown`));
-  assert.equal(calls.length, 2);
+  assert.equal(calls.length, 3);
 });
 
 test('a blocked target is refused before anything is typed', async () => {
@@ -94,7 +96,7 @@ test('a hung wait is killed by the watchdog and a fresh pane that reached done i
   assert.equal(result.exitCode, 0);
   assert.match(result.stdout, new RegExp(`${DELIVERY_MARKER}: confirmed`),
     'idle only reaches done by running a turn, so the turn the wait missed still confirms');
-  assert.deepEqual(calls[3], ['agent', 'get', 'w2:p1'], 'the watchdog falls back to one status read');
+  assert.deepEqual(calls[4], ['agent', 'get', 'w2:p1'], 'the watchdog falls back to one status read');
 });
 
 test('a hung wait with no status movement stays unconfirmed', async () => {
@@ -110,5 +112,6 @@ test('a failed pane run is returned as the failure it is', async () => {
   const { result, calls } = await execute({ FAKE_HERDR_STATUSES: 'idle', FAKE_HERDR_RUN_FAILURE: '1' });
   assert.equal(result.exitCode, 1);
   assert.doesNotMatch(result.stdout, new RegExp(DELIVERY_MARKER));
-  assert.equal(calls.length, 2, 'no wait may follow a failed submit');
+  assert.equal(calls.length, 3, 'no wait may follow a failed submit');
+  assert.ok(!calls.some((call) => call[1] === 'wait'));
 });

@@ -1,6 +1,6 @@
 # Agent Guidance
 
-This file mirrors the Stacking Work Across Lanes, Merge Train Coordination, Coordination Transport Reliability, Routing Substance and Pointers, and Durable Record Setup workflows from [skills/herdr-shepherd/SKILL.md](skills/herdr-shepherd/SKILL.md) so they are visible to any agent working in this repository. Keep AGENTS.md, CLAUDE.md, and SKILL.md in sync when editing them.
+This file mirrors the Stacking Work Across Lanes, Merge Train Coordination, Agent Status as a Coordination Signal, Coordination Transport Reliability, Routing Substance and Pointers, and Durable Record Setup workflows from [skills/herdr-shepherd/SKILL.md](skills/herdr-shepherd/SKILL.md) so they are visible to any agent working in this repository. Keep AGENTS.md, CLAUDE.md, and SKILL.md in sync when editing them.
 
 ## Stacking Work Across Lanes
 
@@ -22,6 +22,33 @@ When multiple lanes converge on one default branch, run the merge as a train wit
 3. After every merge, re-run all gates and broadcast the moved default branch with its new sha to in-flight lanes so they rebase or branch from the current tip.
 4. When the user delegates pane confirmations, ration them: approve autonomously anything in-lane — a design consistent with the tracked issue, read-only inspection, test runs, commits on the lane's own branch, tracker updates. Always escalate remote pushes, default-branch mutations, data deletion, credentials or secrets, visibility changes, and scope expansion.
 5. Independent review is load-bearing, not ceremony: in one nine-lane train, 4 of 5 first-round reviews returned real blockers that lane-local green tests missed — zero-based test clocks versus production monotonic time, mocked lifecycles hiding races, best-effort rollback, and false-success reporting.
+
+## Agent Status as a Coordination Signal
+
+Herdr reports a status per agent, visible in `herdr api snapshot` and `herdr agent get <id>`. It is derived by matching detection rules against the pane's rendered screen, not reported by the agent, so `herdr agent explain <id> --json` — which names the rule that matched, the screen region behind it, and the manifest version used — is the tool for questioning a status you do not believe.
+
+| Status | Means | Use it for |
+|---|---|---|
+| `working` | Mid-turn | An active writer: read its plan before touching shared files, and expect a send to queue behind the running turn. |
+| `idle` | Awaiting input with a live composer | The only state a delivery verdict can be confirmed from, and the safe handoff candidate. |
+| `blocked` | Waiting on a human at a prompt or modal | Never send; surface it to the user. |
+| `done` | Finished a turn and wants attention | A UI attention state, not a lifecycle state. |
+| `unknown` | No agent detected, or detection failed | Ambiguous by construction; read the pane instead. |
+
+Four properties decide how far to trust it:
+
+1. `idle`, `working`, `blocked`, and `unknown` are waitable; `done` is not. `herdr agent wait <id> --status done` is refused with "done is a UI attention state; use idle for CLI agent completion waits". Herdr's `done` also has nothing to do with a tracker's Done column — an agent that finished one turn is not a lane that passed review, and the merge train's Done rule is unaffected by it.
+2. Detection is screen-scraped against a versioned, remotely-updated manifest, so status semantics can drift when that manifest or the agent's own UI changes. An agent that must be trusted rather than guessed at can self-report with `pane report-agent`.
+3. `unknown` is overloaded: a pane running no recognized agent and a pane whose detection failed report identically. Never read it as idle, and never send to it on the assumption it is.
+4. Status says *whether* an agent is running a turn, never *what* it is running. It orders your reads; it never establishes overlap. Read the plan.
+
+### Sweep for blocked panes on every coordination wake
+
+A `blocked` lane is stalled on a human and stays invisible until somebody looks, and you cannot rescue it with a message: a send answers its pending prompt with the default option and discards your text. On each coordination wake, snapshot and surface every blocked pane in the same repo or effort to the user, with its pane ID and what it is asking. Escalation is the entire remedy — there is no coordination move that clears it.
+
+### Check the composer before sending
+
+A send merges with whatever sits unsubmitted in the target's composer and force-submits both as one message, turning a half-typed human thought into a prompt nobody chose to send. `agent explain <id> --json` exposes the composer as the `prompt_box_body` region preview whatever state won detection, so it is readable from a working pane too: an empty composer previews as the bare prompt glyph, and anything else is a draft. The audited wrapper runs this check before every send, on both origins, and refuses when it finds one. `HERDR_SHEPHERD_ALLOW_DIRTY_COMPOSER=1` overrides it, and is only for a merge the user has accepted.
 
 ## Coordination Transport Reliability
 

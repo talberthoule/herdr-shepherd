@@ -115,6 +115,22 @@ function resolveTransport(options, env) {
   return transport;
 }
 
+// Verified live: `agent explain --json` reports the target's composer as the
+// `prompt_box_body` region preview, and reports it whatever state won the
+// detection race - so the draft is readable from a working pane too, not only
+// an idle one. An empty composer previews as the bare prompt glyph.
+const PROMPT_BOX_REGION = 'prompt_box_body';
+const PROMPT_GLYPH = /^[\s ]*[❯>][\s ]*/u;
+
+export function composerDraft(stdout) {
+  let parsed;
+  try { parsed = JSON.parse(stdout); } catch { return null; }
+  const rules = Array.isArray(parsed.evaluated_rules) ? parsed.evaluated_rules : [];
+  const preview = rules.find((rule) => rule?.region === PROMPT_BOX_REGION)?.evidence?.region_preview;
+  if (typeof preview !== 'string') return null;
+  return preview.replace(PROMPT_GLYPH, '').trim() || null;
+}
+
 // Assumption pending live verification: a `--wait` that expires exits nonzero
 // with a timeout diagnostic while the prompt itself has already submitted.
 // Both the structured code and the text fallback are asserted only against
@@ -211,6 +227,24 @@ export async function executeCoordinationRequest(request, options = {}) {
         + 'A send would answer its pending prompt with the default option and discard the message. '
         + 'Resolve the prompt (or have the user answer it), then resend.',
       );
+    }
+    // A send merges with an unsubmitted draft and force-submits both as one
+    // message, so a half-typed human thought becomes a prompt nobody chose to
+    // send. Only a positive reading refuses: an explain that fails or cannot be
+    // parsed leaves the composer unknown, and a false refusal blocks
+    // coordination for a hazard that may not be there.
+    if (env.HERDR_SHEPHERD_ALLOW_DIRTY_COMPOSER !== '1') {
+      const explained = await run(command, [...prefixArgs, 'agent', 'explain', request.target.id, '--json'], env);
+      const draft = explained.exitCode === 0 ? composerDraft(explained.stdout) : null;
+      if (draft) {
+        const excerpt = draft.length > 80 ? `${draft.slice(0, 80)}…` : draft;
+        throw new Error(
+          `refusing to send: ${request.target.id} holds an unsubmitted composer draft (${excerpt}). `
+          + 'A send would merge with it and force-submit both as one message. '
+          + 'Have the draft submitted or cleared, or set HERDR_SHEPHERD_ALLOW_DIRTY_COMPOSER=1 '
+          + 'once the user has accepted the merge.',
+        );
+      }
     }
     if (transport === 'pane-run') {
       // One `pane run` call submits text plus Enter atomically, so there is no

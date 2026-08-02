@@ -43,6 +43,8 @@ test('legacy keystrokes send identifies its source and submits with a delayed En
   assert.deepEqual(calls, [
     ['agent', 'get', 'w2:p1'],
     ['tab', 'get', 'w1:tE'],
+    // Composer check: a draft here would be force-submitted with the message.
+    ['agent', 'explain', 'w2:p1', '--json'],
     ['pane', 'send-text', 'w2:p1', '[Herdr from "codex-complete-MRs-2" (w1:pE)] Resume the official installer build.'],
     ['pane', 'send-keys', 'w2:p1', 'enter'],
     // Post-send status probe: the send reports success, this decides delivery.
@@ -71,6 +73,7 @@ test('failed Enter submissions are reported on the legacy transport', async () =
   assert.deepEqual(calls, [
     ['agent', 'get', 'w2:p1'],
     ['tab', 'get', 'w1:tE'],
+    ['agent', 'explain', 'w2:p1', '--json'],
     ['pane', 'send-text', 'w2:p1', '[Herdr from w1:pE] Resume the official installer build.'],
     ['pane', 'send-keys', 'w2:p1', 'enter'],
   ]);
@@ -124,6 +127,7 @@ test('a transient transport fault is retried and the send proceeds', async () =>
   assert.deepEqual(calls, [
     ['agent', 'get', 'w2:p1'],
     ['agent', 'get', 'w2:p1'],
+    ['agent', 'explain', 'w2:p1', '--json'],
     ['pane', 'send-text', 'w2:p1', '[Herdr from w1:pE] Resume the official installer build.'],
     ['pane', 'send-keys', 'w2:p1', 'enter'],
     ['agent', 'get', 'w2:p1'],
