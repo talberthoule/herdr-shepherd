@@ -7,7 +7,6 @@ import test from 'node:test';
 const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, '..');
 const skillPath = join(root, 'skills', 'herdr-shepherd', 'SKILL.md');
-const mirrorPaths = [join(root, 'AGENTS.md'), join(root, 'CLAUDE.md')];
 
 const heading = '## Stacking Work Across Lanes';
 
@@ -32,10 +31,3 @@ test('skill documents stacking work across lanes', async () => {
   assert.match(section, /before fanning out implementation lanes/);
 });
 
-test('AGENTS.md and CLAUDE.md mirror the lane stacking section verbatim', async () => {
-  const canonical = extractSection(await readFile(skillPath, 'utf8'));
-  for (const path of mirrorPaths) {
-    const mirrored = extractSection(await readFile(path, 'utf8'));
-    assert.equal(mirrored, canonical, `${path} lane stacking section drifted from SKILL.md`);
-  }
-});

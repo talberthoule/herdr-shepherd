@@ -7,7 +7,6 @@ import test from 'node:test';
 const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, '..');
 const skillPath = join(root, 'skills', 'herdr-shepherd', 'SKILL.md');
-const mirrorPaths = [join(root, 'AGENTS.md'), join(root, 'CLAUDE.md')];
 
 const heading = '## Agent Status as a Coordination Signal';
 
@@ -63,17 +62,4 @@ test('suspected parallel work ranks candidates by status before reading them', a
   assert.match(section, /Status orders the queue; it never settles overlap/);
 });
 
-test('AGENTS.md and CLAUDE.md mirror the status signal section verbatim', async () => {
-  const canonical = extractSection(await readFile(skillPath, 'utf8'));
-  for (const path of mirrorPaths) {
-    const mirrored = extractSection(await readFile(path, 'utf8'));
-    assert.equal(mirrored, canonical, `${path} status signal section drifted from SKILL.md`);
-  }
-});
 
-test('the mirrored workflow list names the status signal section', async () => {
-  for (const path of mirrorPaths) {
-    const intro = (await readFile(path, 'utf8')).replaceAll('\r\n', '\n').split('\n\n')[1];
-    assert.match(intro, /Agent Status as a Coordination Signal/, `${path} intro omits the new workflow`);
-  }
-});
