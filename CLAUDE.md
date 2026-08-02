@@ -2,6 +2,12 @@
 
 This file mirrors the Stacking Work Across Lanes, Merge Train Coordination, Agent Status as a Coordination Signal, Coordination Transport Reliability, Routing Substance and Pointers, and Durable Record Setup workflows from [skills/herdr-shepherd/SKILL.md](skills/herdr-shepherd/SKILL.md) so they are visible to any agent working in this repository. Keep AGENTS.md, CLAUDE.md, and SKILL.md in sync when editing them.
 
+## Durable Record Binding
+
+This repository's durable coordination record is **Linear**, project **Herdr** in team **Alpha**, at https://linear.app/alpha-h/project/herdr-7377e1cad6d1. Issue IDs are `ALP-<number>`; reach it through the Linear MCP server connected in-session.
+
+Write findings, verdicts, decisions and their rationale, blockers, plans, and status there, then send pointers that reference the issue ID. Keep ACKs, liveness, and lane claims out of it. Every issue and comment is authored by the human who owns the token, so put agent attribution in the body as described in Routing Substance and Pointers. If the Linear capability is absent from your session, ask the user to authenticate rather than downgrading to a less durable tier.
+
 ## Stacking Work Across Lanes
 
 When one effort fans out into multiple lanes, stack git state, not processes. A lane is a branch plus a tracker issue, not a running pane: at any moment only a pane or two should be executing, while every other lane exists as a committed branch any agent can resume.
