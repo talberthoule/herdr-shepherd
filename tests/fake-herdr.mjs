@@ -27,6 +27,24 @@ if (args[0] === 'agent' && args[1] === 'explain') {
     process.exit(1);
   }
   const draft = process.env.FAKE_HERDR_COMPOSER || '';
+  // Codex's manifest exposes no prompt_box_body region at all; a queue hint in
+  // bottom_non_empty_lines is the only composer evidence it offers.
+  if (process.env.FAKE_HERDR_EXPLAIN_AGENT === 'codex') {
+    process.stdout.write(JSON.stringify({
+      agent: 'codex',
+      state: 'working',
+      evaluated_rules: [
+        { id: 'osc_title_working', matched: true, region: 'osc_title', evidence: { region_preview: 'a task title' } },
+        {
+          id: 'bottom_lines',
+          matched: false,
+          region: 'bottom_non_empty_lines(3)',
+          evidence: { region_preview: draft ? `${draft}\n\n  tab to queue message\n` : 'no pending input\n' },
+        },
+      ],
+    }));
+    process.exit(0);
+  }
   process.stdout.write(JSON.stringify({
     agent: 'claude',
     state: 'idle',

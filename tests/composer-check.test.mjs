@@ -5,7 +5,12 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 
-import { composerDraft, executeCoordinationRequest } from '../skills/herdr-shepherd/scripts/coordinate.mjs';
+import {
+  COMPOSER_MARKER,
+  composerDraft,
+  composerState,
+  executeCoordinationRequest,
+} from '../skills/herdr-shepherd/scripts/coordinate.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const fakeHerdr = join(here, 'fake-herdr.mjs');
@@ -72,6 +77,30 @@ test('an unreadable explain leaves the composer unknown rather than drafted', ()
   assert.equal(composerDraft('not json'), null);
   assert.equal(composerDraft(JSON.stringify({ evaluated_rules: [] })), null);
   assert.equal(composerDraft(JSON.stringify({ evaluated_rules: [{ region: 'osc_title', evidence: { region_preview: 'x' } }] })), null);
+});
+
+test('a composer that could not be read is reported unchecked, never clean', () => {
+  // Verified live: Codex's manifest has no prompt_box_body region, so a
+  // region-only check would score an unread composer identical to an empty one.
+  const codex = JSON.stringify({
+    agent: 'codex',
+    evaluated_rules: [{ region: 'bottom_non_empty_lines(3)', evidence: { region_preview: 'nothing pending\n' } }],
+  });
+  assert.deepEqual(composerState(codex), { checked: false, draft: null });
+  assert.deepEqual(composerState(explainJson('❯\n')), { checked: true, draft: null });
+});
+
+test('the queue hint detects an unsubmitted composer on agents with no prompt box', () => {
+  const codex = JSON.stringify({
+    agent: 'codex',
+    evaluated_rules: [{
+      region: 'bottom_non_empty_lines(3)',
+      evidence: { region_preview: '[Herdr from w1:pE] earlier message\n\n  tab to queue message\n' },
+    }],
+  });
+  const state = composerState(codex);
+  assert.equal(state.checked, true);
+  assert.match(state.draft, /unsubmitted message/);
 });
 
 test('a clean composer is checked once and the send proceeds', async () => {
