@@ -88,21 +88,28 @@ test('a blocked target is refused before anything is typed', async () => {
   assert.ok(calls.every((call) => call[1] === 'get'), 'nothing may be typed at a blocked pane');
 });
 
+// The watchdog window must clear process startup for the spawned fake, or the
+// kill can land before it appends its own call-log line and the assertions race
+// a short list. Assert on the tail rather than a fixed index for the same
+// reason: what matters is that the fallback probe is the last thing that ran.
+const WATCHDOG_MS = 1500;
+
 test('a hung wait is killed by the watchdog and a fresh pane that reached done is confirmed', async () => {
   const { result, calls } = await execute(
     { FAKE_HERDR_STATUSES: 'idle,done', FAKE_HERDR_WAIT_HANG: '1' },
-    { deliveryWaitTimeoutMs: 300, probeRetryDelayMs: 0 },
+    { deliveryWaitTimeoutMs: WATCHDOG_MS, probeRetryDelayMs: 0 },
   );
   assert.equal(result.exitCode, 0);
   assert.match(result.stdout, new RegExp(`${DELIVERY_MARKER}: confirmed`),
     'idle only reaches done by running a turn, so the turn the wait missed still confirms');
-  assert.deepEqual(calls[4], ['agent', 'get', 'w2:p1'], 'the watchdog falls back to one status read');
+  assert.ok(calls.some((call) => call[1] === 'wait'), 'the wait must have been attempted');
+  assert.deepEqual(calls.at(-1), ['agent', 'get', 'w2:p1'], 'the watchdog falls back to one status read');
 });
 
 test('a hung wait with no status movement stays unconfirmed', async () => {
   const { result } = await execute(
     { FAKE_HERDR_STATUSES: 'done,done', FAKE_HERDR_WAIT_HANG: '1' },
-    { deliveryWaitTimeoutMs: 300, probeRetryDelayMs: 0 },
+    { deliveryWaitTimeoutMs: WATCHDOG_MS, probeRetryDelayMs: 0 },
   );
   assert.equal(result.exitCode, 0);
   assert.match(result.stdout, new RegExp(`${DELIVERY_MARKER}: unconfirmed`));
