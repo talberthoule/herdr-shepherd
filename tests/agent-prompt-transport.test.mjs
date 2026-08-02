@@ -50,6 +50,7 @@ test('an idle target is prompted and awaited in one call with no post-send probe
   assert.match(result.stdout, new RegExp(`${DELIVERY_MARKER}: confirmed`));
   assert.deepEqual(calls, [
     ['agent', 'get', 'w2:p1'],
+    ['agent', 'explain', 'w2:p1', '--json'],
     ['agent', 'prompt', 'w2:p1', TEXT, '--wait', '--until', 'working', '--timeout', '5000'],
   ], 'the wait folds into the prompt call, so nothing runs after it');
 });
@@ -58,7 +59,7 @@ test('a working target is prompted without a wait and recorded as queued', async
   const { result, calls } = await execute({ FAKE_HERDR_STATUSES: 'working' });
   assert.equal(result.exitCode, 0);
   assert.match(result.stdout, new RegExp(`${DELIVERY_MARKER}: queued`));
-  assert.deepEqual(calls[1], ['agent', 'prompt', 'w2:p1', TEXT],
+  assert.deepEqual(calls[2], ['agent', 'prompt', 'w2:p1', TEXT],
     'waiting for working on an already-working target would trivially pass without proving submission');
 });
 
@@ -66,7 +67,7 @@ test('an unresolved before-status still submits and reports unknown', async () =
   const { result, calls } = await execute({ FAKE_HERDR_STATUSES: 'none' });
   assert.equal(result.exitCode, 0);
   assert.match(result.stdout, new RegExp(`${DELIVERY_MARKER}: unknown`));
-  assert.deepEqual(calls[1], ['agent', 'prompt', 'w2:p1', TEXT]);
+  assert.deepEqual(calls[2], ['agent', 'prompt', 'w2:p1', TEXT]);
 });
 
 test('an expired wait is an unconfirmed delivery, not a failed send', async () => {
@@ -88,7 +89,7 @@ test('the environment can select the transport when no option is passed', async 
     { FAKE_HERDR_STATUSES: 'idle', HERDR_SHEPHERD_TRANSPORT: 'agent-prompt' },
     { transport: undefined },
   );
-  assert.equal(calls[1][1], 'prompt');
+  assert.equal(calls[2][1], 'prompt');
 });
 
 test('an unknown transport is refused before any Herdr call', async () => {
@@ -104,6 +105,6 @@ test('the default transport is the live-verified pane-run', async () => {
     { transport: undefined },
   );
   assert.deepEqual(calls.map((call) => `${call[0]} ${call[1]}`), [
-    'agent get', 'pane run', 'agent wait',
+    'agent get', 'agent explain', 'pane run', 'agent wait',
   ]);
 });

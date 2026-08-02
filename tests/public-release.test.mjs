@@ -114,6 +114,20 @@ test('retired product state identity appears only in migration history', async (
   }
 });
 
+test('the skill package stands alone without CLAUDE.md or AGENTS.md', async () => {
+  // Those files are this repository's own convention. The installers and both
+  // plugin manifests must never reference them, or the skill would depend on a
+  // convention the projects it installs into do not have.
+  for (const path of ['install.ps1', 'install.sh', '.claude-plugin/plugin.json', '.codex-plugin/plugin.json']) {
+    const content = await readFile(join(root, path), 'utf8');
+    for (const file of ['CLAUDE.md', 'AGENTS.md']) {
+      assert.ok(!content.includes(file), `${path} makes the skill depend on ${file}`);
+    }
+  }
+  const skill = await readFile(join(root, `${skillRoot}/SKILL.md`), 'utf8');
+  assert.match(skill, /never require those files or create them for this purpose/);
+});
+
 test('CI runs the Node suite on Windows and Ubuntu', async () => {
   const workflow = await readFile(join(root, '.github/workflows/test.yml'), 'utf8');
   assert.match(workflow, /windows-latest/);

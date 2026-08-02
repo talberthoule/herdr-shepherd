@@ -13,6 +13,7 @@ const wait = (milliseconds) => new Promise((resolve) => setTimeout(resolve, mill
 const ACTIVE_STATUS = new Set(['working', 'busy', 'running']);
 
 export const DELIVERY_MARKER = 'coordination-delivery';
+export const COMPOSER_MARKER = 'coordination-composer';
 export const WRAPPER_MARKER = 'coordination-wrapper';
 // The hook writes its `attempted` event before the command runs, so a matching
 // event must already exist by the time this process starts. Detection does not
@@ -115,6 +116,40 @@ function resolveTransport(options, env) {
   return transport;
 }
 
+// Verified live: `agent explain --json` reports the target's composer as the
+// `prompt_box_body` region preview, and reports it whatever state won the
+// detection race - so the draft is readable from a working pane too, not only
+// an idle one. An empty composer previews as the bare prompt glyph.
+const PROMPT_BOX_REGION = 'prompt_box_body';
+const PROMPT_GLYPH = /^[\s ]*[❯>][\s ]*/u;
+
+// Verified live: only Claude's manifest exposes a prompt_box_body region.
+// Codex evaluates osc_title, after_last_prompt_marker, whole_recent, and
+// bottom_non_empty_lines(3) instead, so a region-only check silently skips
+// every non-Claude pane - which is worse than no check, because it reports a
+// composer it never read as clean. The queue hint is the agent-agnostic
+// fallback: a TUI renders it only while text sits unsubmitted in the composer.
+const QUEUE_HINT = /\btab to queue message\b/i;
+
+// Reports whether the composer could be read at all, separately from what it
+// held. An unreadable composer must never be reported as a clean one.
+export function composerState(stdout) {
+  let parsed;
+  try { parsed = JSON.parse(stdout); } catch { return { checked: false, draft: null }; }
+  const rules = Array.isArray(parsed.evaluated_rules) ? parsed.evaluated_rules : [];
+  const box = rules.find((rule) => rule?.region === PROMPT_BOX_REGION)?.evidence?.region_preview;
+  if (typeof box === 'string') return { checked: true, draft: box.replace(PROMPT_GLYPH, '').trim() || null };
+  const previews = rules.map((rule) => rule?.evidence?.region_preview).filter((preview) => typeof preview === 'string');
+  if (previews.some((preview) => QUEUE_HINT.test(preview))) {
+    return { checked: true, draft: 'an unsubmitted message (queue hint visible)' };
+  }
+  return { checked: false, draft: null };
+}
+
+export function composerDraft(stdout) {
+  return composerState(stdout).draft;
+}
+
 // Assumption pending live verification: a `--wait` that expires exits nonzero
 // with a timeout diagnostic while the prompt itself has already submitted.
 // Both the structured code and the text fallback are asserted only against
@@ -212,6 +247,33 @@ export async function executeCoordinationRequest(request, options = {}) {
         + 'Resolve the prompt (or have the user answer it), then resend.',
       );
     }
+    // A send merges with an unsubmitted draft and force-submits both as one
+    // message, so a half-typed human thought becomes a prompt nobody chose to
+    // send. Only a positive reading refuses: an explain that fails or cannot be
+    // parsed leaves the composer unknown, and a false refusal blocks
+    // coordination for a hazard that may not be there.
+    let composerNotice = '';
+    if (env.HERDR_SHEPHERD_ALLOW_DIRTY_COMPOSER !== '1') {
+      const explained = await run(command, [...prefixArgs, 'agent', 'explain', request.target.id, '--json'], env);
+      const { checked, draft } = explained.exitCode === 0
+        ? composerState(explained.stdout)
+        : { checked: false, draft: null };
+      // Silence would claim a clean composer the check never read. Say so
+      // instead, so the operator knows this send went out unguarded.
+      if (!checked) composerNotice = `${COMPOSER_MARKER}: unchecked (no readable composer region for ${request.target.id})\n`;
+      if (draft) {
+        const excerpt = draft.length > 80 ? `${draft.slice(0, 80)}…` : draft;
+        throw new Error(
+          `refusing to send: ${request.target.id} holds an unsubmitted composer draft (${excerpt}). `
+          + 'A send would merge with it and force-submit both as one message. '
+          + 'Have the draft submitted or cleared, or set HERDR_SHEPHERD_ALLOW_DIRTY_COMPOSER=1 '
+          + 'once the user has accepted the merge.',
+        );
+      }
+    }
+    // Wrapped so the composer notice is attached once, at the single exit,
+    // rather than at each transport's several returns.
+    const submitViaTransport = async () => {
     if (transport === 'pane-run') {
       // One `pane run` call submits text plus Enter atomically, so there is no
       // composer race and no separate typed Enter. The delivery verdict is
@@ -279,6 +341,9 @@ export async function executeCoordinationRequest(request, options = {}) {
     const after = await probeAgent(() => run(command, [...prefixArgs, 'agent', 'get', request.target.id], env), options);
     const verdict = deliveryVerdict(statusBefore, agentStatus(after.result.stdout));
     return { ...submitted, stdout: `${submitted.stdout}\n${DELIVERY_MARKER}: ${verdict}\n` };
+    };
+    const sent = await submitViaTransport();
+    return composerNotice ? { ...sent, stdout: `${composerNotice}${sent.stdout}` } : sent;
   }
   return run(command, [...prefixArgs, ...request.args], env);
 }

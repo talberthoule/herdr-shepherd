@@ -14,9 +14,10 @@ Treat Herdr as shared working context. Inspect relevant tabs before searching el
 Run a silent Herdr check when at least one concrete signal suggests another writer: an unexpected branch or `HEAD`, unfamiliar changes that may overlap the task, a file changing during inspection, or explicit evidence of another active tool, agent, or shared worktree. A dirty tree by itself, expected user edits, and unrelated generated files are not enough.
 
 1. Snapshot Herdr and narrow candidates to panes whose cwd or worktree belongs to the same repository.
-2. Read likely owners' actual plans before inferring overlap from tab labels or filenames.
-3. If no same-repository ownership or task overlap appears, continue silently without messaging.
-4. If target-file overlap is confirmed or ownership remains unclear, coordinate before editing or mutating Git state.
+2. Rank those candidates by status before spending reads: `working` panes are active writers and are read first, `blocked` panes are stalled on a human and get surfaced rather than messaged, `idle` and `done` panes are dormant and are the handoff candidates. Status orders the queue; it never settles overlap.
+3. Read likely owners' actual plans before inferring overlap from tab labels or filenames.
+4. If no same-repository ownership or task overlap appears, continue silently without messaging.
+5. If target-file overlap is confirmed or ownership remains unclear, coordinate before editing or mutating Git state.
 
 ## Workflow
 
@@ -118,6 +119,40 @@ A direct user request may authorize broader Herdr actions. Mark those `user-dire
 
 Every mutation must use the audited wrapper. Read [references/command-policy.md](references/command-policy.md) before the first mutation in a turn. Raw Herdr mutations are denied by the profile hook, and the wrapper refuses to send at all when it cannot confirm the hook audited the attempt.
 
+## Agent Status as a Coordination Signal
+
+Herdr reports a status per agent, visible in `herdr api snapshot` and `herdr agent get <id>`. It is derived by matching detection rules against the pane's rendered screen, not reported by the agent, so `herdr agent explain <id> --json` — which names the rule that matched, the screen region behind it, and the manifest version used — is the tool for questioning a status you do not believe.
+
+| Status | Means | Use it for |
+|---|---|---|
+| `working` | Mid-turn | An active writer: read its plan before touching shared files, and expect a send to queue behind the running turn. |
+| `idle` | Awaiting input with a live composer | The only state a delivery verdict can be confirmed from, and the safe handoff candidate. |
+| `blocked` | Waiting on a human at a prompt or modal | Never send; surface it to the user. |
+| `done` | Finished a turn and wants attention | A UI attention state, not a lifecycle state. |
+| `unknown` | No agent detected, or detection failed | Ambiguous by construction; read the pane instead. |
+
+Four properties decide how far to trust it:
+
+1. `idle`, `working`, `blocked`, and `unknown` are waitable; `done` is not. `herdr agent wait <id> --status done` is refused with "done is a UI attention state; use idle for CLI agent completion waits". Herdr's `done` also has nothing to do with a tracker's Done column — an agent that finished one turn is not a lane that passed review, and the merge train's Done rule is unaffected by it.
+2. Detection is screen-scraped against a versioned, remotely-updated manifest, so status semantics can drift when that manifest or the agent's own UI changes. An agent that must be trusted rather than guessed at can self-report with `pane report-agent`.
+3. `unknown` is overloaded: a pane running no recognized agent and a pane whose detection failed report identically. Never read it as idle, and never send to it on the assumption it is.
+4. Status says *whether* an agent is running a turn, never *what* it is running. It orders your reads; it never establishes overlap. Read the plan.
+
+### Sweep for blocked panes on every coordination wake
+
+A `blocked` lane is stalled on a human and stays invisible until somebody looks, and you cannot rescue it with a message: a send answers its pending prompt with the default option and discards your text. On each coordination wake, snapshot and surface every blocked pane in the same repo or effort to the user, with its pane ID and what it is asking. Escalation is the entire remedy — there is no coordination move that clears it.
+
+### Check the composer before sending
+
+A send merges with whatever sits unsubmitted in the target's composer and force-submits both as one message, turning a half-typed human thought into a prompt nobody chose to send. The audited wrapper checks for that before every send, on both origins, and refuses when it finds a draft; `HERDR_SHEPHERD_ALLOW_DIRTY_COMPOSER=1` overrides it, and is only for a merge the user has accepted.
+
+How well the check sees depends on the target's detection manifest, and the difference matters:
+
+- **Claude panes are fully readable.** `agent explain <id> --json` exposes the composer as the `prompt_box_body` region preview whatever state won detection, so it reads from a working pane too. An empty composer previews as the bare prompt glyph; anything else is a draft.
+- **Other agents are readable in one direction only.** Codex's manifest has no prompt box — it evaluates `osc_title`, `after_last_prompt_marker`, `whole_recent`, and `bottom_non_empty_lines(3)` — so the fallback is the `tab to queue message` hint, which a TUI renders only while text waits unsubmitted. That proves a dirty composer but can never prove a clean one: an empty composer and an unreadable one look identical.
+
+A send the check could not read carries `coordination-composer: unchecked` in its output and audit entry. Read that as *this send went out unguarded*, not as a clean composer — and never as grounds for a blind resend, which is the move that appends a duplicate to a composer already holding your last message.
+
 ## Coordination Transport Reliability
 
 A send submits the message into the target agent's session in one atomic `pane run` call — text plus Enter together, honoring the pane's bracketed-paste mode — and the wrapper derives a delivery verdict from the target's status stream. Multi-line and long payloads arrive intact on this transport; what stays uncertain is the target's state, not the typing. Field-tested rules:
@@ -175,7 +210,13 @@ When a repository has no durable record bound yet, establish one before relying 
    - A shared file at a stable absolute path — last resort; durable only on one machine, so say so.
 3. **Walk the signup and configuration** for the chosen option rather than handing over a link. Confirm the workspace or repository, create or identify the container (project, label, or directory), and confirm the naming convention for records.
 4. **Prove it round-trips** before declaring it ready: write one probe record, read it back by ID, then delete or clearly mark the probe. An unverified binding is not a durable record.
-5. **Record the binding where future agents will read it** — the repo's `CLAUDE.md` or `AGENTS.md`, naming the system, the exact container, and the ID format. This is what makes the choice survive context loss; a binding held only in one session is not configured.
+5. **Record the binding where future agents will read it** — a committed `.herdr-shepherd.json` at the repo root, naming the system, the exact container, and the ID format:
+
+   ```json
+   {"record": {"system": "linear", "container": "project Herdr (team Alpha)", "id_format": "ALP-<number>", "url": "https://linear.app/…"}}
+   ```
+
+   Committed, so it travels with the repo and survives context loss, and runtime-neutral, so a Codex session and a Claude session resolve the same binding. Where a project already keeps agent instructions in `CLAUDE.md` or `AGENTS.md`, a mirrored line there is welcome — but never require those files or create them for this purpose, because most projects do not use them and the binding must not depend on a convention the project has not adopted. A binding held only in one session is not configured.
 6. **Report what was created**, including anything the user now owns externally (a new account, project, or label), so nothing external appears without their knowledge.
 
 Treat missing credentials as a stop, not a workaround: ask the user to authenticate rather than downgrading to a less durable tier on their behalf.
@@ -247,6 +288,9 @@ The hook records attempted and outcome events, redacts obvious secrets, and open
 | Need | Action |
 |---|---|
 | Discover other work | `herdr api snapshot` |
+| Rank who to read first | Status from the snapshot: `working` before `idle`/`done`; `blocked` goes to the user |
+| Question a status you do not believe | `herdr agent explain <id> --json` — names the matched rule, its screen region, and the manifest version |
+| Check a target's composer before sending | `herdr agent explain <id> --json`, `prompt_box_body` region preview; the wrapper enforces this |
 | Suspect parallel code changes | Match same-repo panes, read likely owners, message only for overlap |
 | Recover pane context | `herdr pane read <id> --source recent-unwrapped` |
 | Coordinate ownership | Audited `agent send` wrapper |
@@ -275,7 +319,11 @@ The hook records attempted and outcome events, redacts obvious secrets, and open
 - Do not read an empty `git -C <dir> status` as a clean worktree. On a broken worktree the command fails and prints nothing, so counting output lines scores it identical to clean. Check the command succeeded before trusting the result.
 - Do not rely on a submitted `agent send` to stop an imminent collision. It is a queued message, not an interrupt. Escalate time-critical conflicts to the user.
 - Do not send to a `blocked` pane, and do not work around the wrapper's refusal. The submit's Enter answers the pending prompt with its default option and discards your message — it takes a decision on the user's behalf.
-- Do not send to a pane whose composer holds an unsubmitted draft. The send merges with the draft and force-submits both as one message; pane read shows the composer line, so check it first.
+- Do not leave a blocked pane for someone else to notice. Surface it to the user on the coordination wake that found it; no message you can send will clear it.
+- Do not send to a pane whose composer holds an unsubmitted draft. The send merges with the draft and force-submits both as one message; the wrapper refuses on a positive reading, and `HERDR_SHEPHERD_ALLOW_DIRTY_COMPOSER=1` is for a merge the user accepted, not for clearing an inconvenient refusal.
+- Do not read `unknown` as idle. It means no agent was detected or that detection failed — different problems, and neither is safe to send to.
+- Do not wait on `done`. It is a UI attention state rather than a lifecycle one, and Herdr's `done` says nothing about a tracker's Done column.
+- Do not treat status as evidence of what an agent is working on. It orders your reads; only the plan settles overlap.
 - Do not trust `agent wait --timeout`; the flag is ignored and the command blocks until the state arrives. Bound waits with your own watchdog, as the wrapper does.
 - Do not inline long payloads in a send even though the default transport delivers them intact. Substance belongs in the durable record; the legacy keystroke transport still head-truncates at 1024 characters.
 - Do not judge overlap by tab label. Read the other agent's plan; near-identical work often hides behind different names.

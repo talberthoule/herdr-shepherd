@@ -18,6 +18,45 @@ if (process.env.FAKE_HERDR_RUN_FAILURE && args[0] === 'pane' && args[1] === 'run
   process.stderr.write('pane run failed\n');
   process.exit(1);
 }
+// Mirrors the live `agent explain --json` shape: every evaluated rule is
+// reported, and the composer lives in the prompt_box_body region preview
+// whether or not that rule won the detection race.
+if (args[0] === 'agent' && args[1] === 'explain') {
+  if (process.env.FAKE_HERDR_EXPLAIN_FAILURE) {
+    process.stderr.write('explain failed\n');
+    process.exit(1);
+  }
+  const draft = process.env.FAKE_HERDR_COMPOSER || '';
+  // Codex's manifest exposes no prompt_box_body region at all; a queue hint in
+  // bottom_non_empty_lines is the only composer evidence it offers.
+  if (process.env.FAKE_HERDR_EXPLAIN_AGENT === 'codex') {
+    process.stdout.write(JSON.stringify({
+      agent: 'codex',
+      state: 'working',
+      evaluated_rules: [
+        { id: 'osc_title_working', matched: true, region: 'osc_title', evidence: { region_preview: 'a task title' } },
+        {
+          id: 'bottom_lines',
+          matched: false,
+          region: 'bottom_non_empty_lines(3)',
+          evidence: { region_preview: draft ? `${draft}\n\n  tab to queue message\n` : 'no pending input\n' },
+        },
+      ],
+    }));
+    process.exit(0);
+  }
+  process.stdout.write(JSON.stringify({
+    agent: 'claude',
+    state: 'idle',
+    manifest_version: '2026.07.13.1',
+    matched_rule: { id: 'live_prompt_box', priority: 950, region: 'prompt_box_body', state: 'idle' },
+    evaluated_rules: [
+      { id: 'osc_title_working', matched: false, priority: 1100, region: 'osc_title', state: 'working', evidence: { region_preview: '✳ a task title' } },
+      { id: 'live_prompt_box', matched: true, priority: 950, region: 'prompt_box_body', state: 'idle', evidence: { region_preview: draft ? `❯ ${draft}\n` : '❯\n' } },
+    ],
+  }));
+  process.exit(0);
+}
 if (args[0] === 'agent' && args[1] === 'wait') {
   // Models the live 0.7.2-preview behavior: the wait resolves with agent info
   // when the state arrives (or is already true) and otherwise blocks forever,
