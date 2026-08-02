@@ -77,9 +77,9 @@ test('transport reliability separates ACK from proof of submission', async () =>
     '## Coordination Transport Reliability',
   );
   assert.match(section, /An ACK proves the recipient holds the content, not that your send delivered it/);
-  assert.match(section, /pull the content by pane read while your message sits unsubmitted/);
-  assert.match(section, /tab to queue message/);
-  assert.match(section, /submits a duplicate of work already done/);
+  assert.match(section, /pull the content by pane read before your message surfaces/);
+  assert.match(section, /do not resend after an `unconfirmed` verdict/);
+  assert.match(section, /duplicate turn over work already done/);
 });
 
 test('viewer labels the succeeded phase as sent without changing the stored value', async () => {
@@ -104,7 +104,7 @@ test('viewer labels the succeeded phase as sent without changing the stored valu
 test('skill describes the viewer label honestly', async () => {
   const skill = await readFile(skillPath, 'utf8');
   assert.match(skill, /displays as \*\*sent\*\*/);
-  assert.match(skill, /not proof the target submitted or read it/);
+  assert.match(skill, /not proof the target read or acted on it/);
   assert.doesNotMatch(skill, /The viewer defaults to succeeded events\./);
 });
 

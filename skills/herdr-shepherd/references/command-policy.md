@@ -13,7 +13,7 @@ Pipe one literal JSON object directly to `scripts/coordinate.mjs --stdin`, throu
 | `reason` | yes | Concise coordination reason |
 | `message` | yes | Outbound text, or an empty string for actions without text |
 
-For `proactive`, `args` must be exactly `['agent', 'send', targetId, message]`; `target` and `message` must match those arguments. The wrapper verifies the agent exists, prefixes the source tab/pane for the recipient, types the message, and sends Enter after a short delay. A successful audit outcome means submission to the pane, not proof that the agent started a new turn.
+For `proactive`, `args` must be exactly `['agent', 'send', targetId, message]`; `target` and `message` must match those arguments. The wrapper verifies the agent exists, refuses a `blocked` target (the submit would answer its pending prompt and discard the message), prefixes the source tab/pane for the recipient, submits the message atomically via `pane run`, and records an event-driven delivery verdict. A successful audit outcome means the message was submitted, and only a `confirmed` verdict proves the agent started a new turn.
 
 ## Probe failures
 

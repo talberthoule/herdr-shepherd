@@ -23,21 +23,29 @@ function extractSection(raw) {
 test('skill documents coordination transport reliability', async () => {
   const skill = await readFile(skillPath, 'utf8');
   const section = extractSection(skill);
-  assert.match(section, /types the `message` field verbatim/);
-  assert.match(section, /first 1024 characters/);
-  assert.match(section, /part 1\/2/);
-  assert.match(section, /sender's session log/);
-  assert.match(section, /within about 20 seconds/);
-  assert.match(section, /stuck composers/);
+  assert.match(section, /one atomic `pane run` call/);
+  assert.match(section, /submits the `message` field verbatim/);
+  assert.match(section, /probes the target's status before the send/);
+  assert.match(section, /Only `confirmed` may be treated as delivered/);
+  assert.match(section, /Never send to a `blocked` target/);
+  assert.match(section, /answers the pane's pending prompt with its default option/);
+  assert.match(section, /force-submits both as one message/);
   assert.match(section, /ground truth/);
   assert.match(section, /branch-ready claim/);
   assert.match(section, /ACKs of ACKs/);
   assert.match(section, /unsolicited routine chatter/);
   assert.match(section, /ACK-requested still requires a compact ACK/);
-  assert.match(section, /stuck composer is indistinguishable from understood/);
   assert.match(section, /sender owns delivery recovery/);
   assert.match(section, /never the fallback/);
   assert.match(section, /do-not-acknowledge/);
+  assert.match(section, /`agent wait` and trust `--timeout`/);
+  // Legacy keystroke-transport hazards stay documented while the fallback exists.
+  assert.match(section, /first 1024 characters/);
+  assert.match(section, /part 1\/2/);
+  assert.match(section, /sender's session log/);
+  assert.match(section, /within about 20 seconds/);
+  assert.match(section, /stuck composers/);
+  assert.match(section, /stuck composer is indistinguishable from understood/);
   assert.doesNotMatch(section, /treat silence as understood/);
 });
 

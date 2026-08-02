@@ -10,6 +10,38 @@ if (process.env.FAKE_HERDR_KEYS_FAILURE && args[0] === 'pane' && args[1] === 'se
   process.stderr.write('send keys failed\n');
   process.exit(1);
 }
+if (process.env.FAKE_HERDR_PROMPT_FAILURE && args[0] === 'agent' && args[1] === 'prompt') {
+  process.stderr.write('prompt failed\n');
+  process.exit(1);
+}
+if (process.env.FAKE_HERDR_RUN_FAILURE && args[0] === 'pane' && args[1] === 'run') {
+  process.stderr.write('pane run failed\n');
+  process.exit(1);
+}
+if (args[0] === 'agent' && args[1] === 'wait') {
+  // Models the live 0.7.2-preview behavior: the wait resolves with agent info
+  // when the state arrives (or is already true) and otherwise blocks forever,
+  // ignoring --timeout; the hang must be killed by the wrapper's watchdog.
+  if (process.env.FAKE_HERDR_WAIT_HANG) {
+    setTimeout(() => process.exit(1), 30_000);
+    await new Promise(() => {});
+  } else {
+    process.stdout.write(JSON.stringify({
+      id: 'cli:agent:wait:resolve',
+      result: { agent: { pane_id: args[2], agent_status: 'working' }, type: 'agent_info' },
+    }));
+    process.exit(0);
+  }
+}
+// Models the assumed live behavior of an expired `--wait`: the prompt has
+// submitted, the wait exits nonzero with a structured timeout diagnostic.
+if (process.env.FAKE_HERDR_PROMPT_WAIT_TIMEOUT && args[0] === 'agent' && args[1] === 'prompt' && args.includes('--wait')) {
+  process.stderr.write(`${JSON.stringify({
+    error: { code: 'wait_timeout', message: `timed out waiting for ${args[2]} to reach working` },
+    id: 'cli:agent:prompt',
+  })}\n`);
+  process.exit(1);
+}
 const priorGets = () => readFileSync(process.env.FAKE_HERDR_LOG, 'utf8')
   .trim().split(/\r?\n/).map(JSON.parse)
   .filter((call) => call[0] === 'agent' && call[1] === 'get').length;

@@ -40,6 +40,7 @@ test('controlled fake-Herdr simulation keeps lifecycle mutations user-directed',
     ...process.env,
     FAKE_HERDR_LOG: log,
     FAKE_HERDR_TAB_LABEL: 'coordinator',
+    FAKE_HERDR_STATUSES: 'idle',
     HERDR_PANE_ID: 'w4:p1',
     HERDR_TAB_ID: 'w4:t1',
   };
@@ -73,10 +74,12 @@ test('controlled fake-Herdr simulation keeps lifecycle mutations user-directed',
   const calls = (await readFile(log, 'utf8')).trim().split(/\r?\n/).map(JSON.parse);
   assert.deepEqual(calls.filter((call) => call[0] === 'pane' && call[1] === 'close'), [['pane', 'close', 'w2:p6']]);
   assert.equal(calls.some((call) => call.includes('w4:p1') && call[1] === 'close'), false);
-  // Every send to the helper is bracketed by a status probe: existence/status
-  // before it, delivery verdict after it.
-  const sends = calls.filter((call) => call[0] === 'pane' && call[1] === 'send-text' && call[2] === 'w2:p6').length;
+  // Every send to the helper is verified: existence/status probed before it,
+  // and an event-driven delivery wait resolves the verdict after it.
+  const sends = calls.filter((call) => call[0] === 'pane' && call[1] === 'run' && call[2] === 'w2:p6').length;
   const probes = calls.filter((call) => call[0] === 'agent' && call[1] === 'get' && call[2] === 'w2:p6').length;
+  const waits = calls.filter((call) => call[0] === 'agent' && call[1] === 'wait' && call[2] === 'w2:p6').length;
   assert.equal(sends, 3);
-  assert.equal(probes, sends * 2, 'each send should probe the target before and after');
+  assert.equal(probes, sends, 'each send should probe the target before submitting');
+  assert.equal(waits, sends, 'each send should resolve its delivery verdict');
 });

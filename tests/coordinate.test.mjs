@@ -21,12 +21,13 @@ function request(origin = 'proactive') {
   };
 }
 
-test('proactive send identifies its source and submits with a delayed Enter', async () => {
+test('legacy keystrokes send identifies its source and submits with a delayed Enter', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'fake-herdr-'));
   const log = join(dir, 'calls.jsonl');
   const result = await executeCoordinationRequest(request(), {
     command: process.execPath,
     prefixArgs: [fakeHerdr],
+    transport: 'keystrokes',
     env: {
       ...process.env,
       FAKE_HERDR_LOG: log,
@@ -49,12 +50,13 @@ test('proactive send identifies its source and submits with a delayed Enter', as
   ]);
 });
 
-test('failed Enter submissions are reported', async () => {
+test('failed Enter submissions are reported on the legacy transport', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'fake-herdr-'));
   const log = join(dir, 'calls.jsonl');
   const result = await executeCoordinationRequest(request(), {
     command: process.execPath,
     prefixArgs: [fakeHerdr],
+    transport: 'keystrokes',
     env: {
       ...process.env,
       FAKE_HERDR_LOG: log,
@@ -105,6 +107,7 @@ test('a transient transport fault is retried and the send proceeds', async () =>
   const result = await executeCoordinationRequest(request(), {
     command: process.execPath,
     prefixArgs: [fakeHerdr],
+    transport: 'keystrokes',
     env: {
       ...process.env,
       FAKE_HERDR_LOG: log,
