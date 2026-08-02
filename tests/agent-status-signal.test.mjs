@@ -43,9 +43,14 @@ test('skill requires a blocked sweep and names escalation as the remedy', async 
 test('skill documents the composer check the wrapper enforces', async () => {
   const section = extractSection(await readFile(skillPath, 'utf8'));
   assert.match(section, /`prompt_box_body` region preview/);
-  assert.match(section, /readable from a working pane too/);
+  assert.match(section, /reads from a working pane too/);
   assert.match(section, /before every send, on both origins/);
   assert.match(section, /HERDR_SHEPHERD_ALLOW_DIRTY_COMPOSER=1/);
+  // The one-sided fallback is the part an operator must not misread.
+  assert.match(section, /tab to queue message/);
+  assert.match(section, /proves a dirty composer but can never prove a clean one/);
+  assert.match(section, /coordination-composer: unchecked/);
+  assert.match(section, /this send went out unguarded/);
 });
 
 test('suspected parallel work ranks candidates by status before reading them', async () => {

@@ -48,7 +48,14 @@ A `blocked` lane is stalled on a human and stays invisible until somebody looks,
 
 ### Check the composer before sending
 
-A send merges with whatever sits unsubmitted in the target's composer and force-submits both as one message, turning a half-typed human thought into a prompt nobody chose to send. `agent explain <id> --json` exposes the composer as the `prompt_box_body` region preview whatever state won detection, so it is readable from a working pane too: an empty composer previews as the bare prompt glyph, and anything else is a draft. The audited wrapper runs this check before every send, on both origins, and refuses when it finds one. `HERDR_SHEPHERD_ALLOW_DIRTY_COMPOSER=1` overrides it, and is only for a merge the user has accepted.
+A send merges with whatever sits unsubmitted in the target's composer and force-submits both as one message, turning a half-typed human thought into a prompt nobody chose to send. The audited wrapper checks for that before every send, on both origins, and refuses when it finds a draft; `HERDR_SHEPHERD_ALLOW_DIRTY_COMPOSER=1` overrides it, and is only for a merge the user has accepted.
+
+How well the check sees depends on the target's detection manifest, and the difference matters:
+
+- **Claude panes are fully readable.** `agent explain <id> --json` exposes the composer as the `prompt_box_body` region preview whatever state won detection, so it reads from a working pane too. An empty composer previews as the bare prompt glyph; anything else is a draft.
+- **Other agents are readable in one direction only.** Codex's manifest has no prompt box — it evaluates `osc_title`, `after_last_prompt_marker`, `whole_recent`, and `bottom_non_empty_lines(3)` — so the fallback is the `tab to queue message` hint, which a TUI renders only while text waits unsubmitted. That proves a dirty composer but can never prove a clean one: an empty composer and an unreadable one look identical.
+
+A send the check could not read carries `coordination-composer: unchecked` in its output and audit entry. Read that as *this send went out unguarded*, not as a clean composer — and never as grounds for a blind resend, which is the move that appends a duplicate to a composer already holding your last message.
 
 ## Coordination Transport Reliability
 
