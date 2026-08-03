@@ -98,9 +98,12 @@ test('viewer labels the succeeded phase as sent without changing the stored valu
   assert.match(viewer, /PHASE_LABEL=\{[^}]*succeeded:'sent'/);
   assert.match(viewer, /esc\(PHASE_LABEL\[e\.phase\]\|\|e\.phase\)/);
   assert.doesNotMatch(viewer, /<span class="'\+esc\(e\.phase\)\+'">'\+esc\(e\.phase\)/);
-  // A standing legend states what "sent" does and does not prove.
-  assert.match(viewer, /does not confirm the target submitted or read it/);
-  assert.match(viewer, /Confirm delivery by pane read/);
+  // A standing legend states what "sent" does and does not prove. It must not
+  // describe the retired keystroke path: the default transport submits
+  // atomically and never "types" anything.
+  assert.match(viewer, /does not confirm the target read or acted on it/);
+  assert.match(viewer, /Check the delivery verdict/);
+  assert.doesNotMatch(viewer, /typed the message and pressed Enter/);
   assert.match(viewer, /PHASE_TITLE=\{[^}]*Delivery is unconfirmed/);
 });
 

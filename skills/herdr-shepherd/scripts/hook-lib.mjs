@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
-import { appendAuditEvent, classifyShellCommand, defaultStateDir, redactOutboundText, validateCoordinationRequest } from './core.mjs';
+import { appendAuditEvent, classifyShellCommand, defaultStateDir, redactOutboundText, requestDigest, validateCoordinationRequest } from './core.mjs';
 
 const wrapperPatterns = [
   {
@@ -50,11 +50,17 @@ function outcome(payload) {
   // Records which wrapper actually performed the send, so a stale path or a
   // superseded plugin copy is attributable after the fact.
   const wrapper = markers.match(/coordination-wrapper:\s*([^\r\n]+)/)?.[1]?.trim();
+  // Stored as a first-class field like delivery and wrapper. It previously
+  // survived only incidentally inside outcome_summary, which the viewer never
+  // renders for a send - so an operator auditing which submits went out
+  // unguarded found nothing and concluded every one had been checked.
+  const composer = markers.match(/coordination-composer:\s*(unchecked|bypassed)/)?.[1];
   return {
     phase: failed ? 'failed' : 'succeeded',
     summary: redactOutboundText(text.slice(0, 1000)).redacted,
     delivery,
     wrapper,
+    composer,
   };
 }
 
@@ -186,6 +192,12 @@ export async function handleHookPayload(payload, options = {}) {
     reason: request.reason,
     message_redacted: redaction.redacted,
     message_sha256: redaction.sha256,
+    // What actually ran. The event used to carry only the constant action
+    // "herdr.exec", so a recorded coordination toward a pane said nothing about
+    // the command performed, and the digest that authorizes it now binds the
+    // same shape rather than the message alone.
+    args_redacted: (Array.isArray(request.args) ? request.args : []).map((arg) => redactOutboundText(String(arg)).redacted),
+    request_sha256: requestDigest(request),
   };
   if (eventName === 'PreToolUse') {
     await appendAuditEvent(stateDir, { ...base, phase: 'attempted' });
@@ -202,6 +214,7 @@ export async function handleHookPayload(payload, options = {}) {
       outcome_summary: result.summary,
       ...(result.delivery ? { delivery: result.delivery } : {}),
       ...(result.wrapper ? { wrapper: result.wrapper } : {}),
+      ...(result.composer ? { composer: result.composer } : {}),
     });
   }
   return {};

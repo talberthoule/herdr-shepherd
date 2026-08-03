@@ -42,9 +42,11 @@ test('legacy keystrokes send identifies its source and submits with a delayed En
   const calls = (await readFile(log, 'utf8')).trim().split(/\r?\n/).map(JSON.parse);
   assert.deepEqual(calls, [
     ['agent', 'get', 'w2:p1'],
-    ['tab', 'get', 'w1:tE'],
-    // Composer check: a draft here would be force-submitted with the message.
+    // Guards run before the cosmetic source-label lookup: a draft here would be
+    // force-submitted with the message, and a blocked pane would answer its
+    // prompt, so neither should wait on a `tab get`.
     ['agent', 'explain', 'w2:p1', '--json'],
+    ['tab', 'get', 'w1:tE'],
     ['pane', 'send-text', 'w2:p1', '[Herdr from "codex-complete-MRs-2" (w1:pE)] Resume the official installer build.'],
     ['pane', 'send-keys', 'w2:p1', 'enter'],
     // Post-send status probe: the send reports success, this decides delivery.
@@ -72,8 +74,8 @@ test('failed Enter submissions are reported on the legacy transport', async () =
   const calls = (await readFile(log, 'utf8')).trim().split(/\r?\n/).map(JSON.parse);
   assert.deepEqual(calls, [
     ['agent', 'get', 'w2:p1'],
-    ['tab', 'get', 'w1:tE'],
     ['agent', 'explain', 'w2:p1', '--json'],
+    ['tab', 'get', 'w1:tE'],
     ['pane', 'send-text', 'w2:p1', '[Herdr from w1:pE] Resume the official installer build.'],
     ['pane', 'send-keys', 'w2:p1', 'enter'],
   ]);
