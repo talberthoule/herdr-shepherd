@@ -11,8 +11,19 @@ const READ_COMMANDS = new Set([
   'workspace get', 'workspace list',
 ]);
 const SECRET_PATTERNS = [
-  /\b(?:token|password|secret|api[_-]?key)\s*[:=]\s*[^\s"']+/giu,
-  /\b(?:ghp|github_pat|sk|xox[baprs])_[A-Za-z0-9_-]{12,}\b/gu,
+  // A leading [A-Za-z0-9_]* is required: `\b` cannot match after an underscore,
+  // so without it every AWS_SECRET_ACCESS_KEY= / DB_PASSWORD= style assignment
+  // escaped - and .env fragments are exactly what agents paste to each other.
+  // The surrounding [A-Za-z0-9_]* runs are both required: `\b` cannot match
+  // after an underscore, so DB_PASSWORD= escaped on the left, and the keyword
+  // is rarely the last word - AWS_SECRET_ACCESS_KEY= escaped on the right.
+  /[A-Za-z0-9_]*(?:token|password|passwd|secret|api[_-]?key|credential)[A-Za-z0-9_]*\s*[:=]\s*[^\s"']+/giu,
+  // Real Anthropic/OpenAI/Slack keys separate with `-`, not only `_`.
+  /\b(?:ghp|gho|ghu|ghs|github_pat|sk|pk|xox[baprs])[-_][A-Za-z0-9_-]{12,}\b/gu,
+  /\bAKIA[0-9A-Z]{16}\b/gu,
+  /\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\b/gu,
+  // Credentials embedded in a URL: scheme://user:secret@host
+  /\b[a-z][a-z0-9+.-]*:\/\/[^\s:/@]+:[^\s:/@]+@/giu,
   /\bBearer\s+[A-Za-z0-9._~+\/-]{12,}=*\b/giu,
   /-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----/gu,
 ];
@@ -51,13 +62,29 @@ export function maskQuotedArguments(command = '') {
   });
 }
 
+// Every invocation in the command is classified, not just the first. A single
+// `.match()` meant `herdr agent list && herdr pane kill w1:p3` scored as the
+// leading read and passed the gate unaudited - and list-then-act is the most
+// natural compound in a multiplexer, so that was an accidental bypass rather
+// than a determined one. An unquoted path to the binary is also recognised:
+// masking only ever handled quoted paths, so `./herdr`, `/usr/bin/herdr`, and
+// `OUT=$(herdr ...)` all read as unrelated commands.
+const INVOCATION = /(?:^|[\s;&|(=`])(?:[^\s;&|"'`]*[\\/])?herdr(?:\.exe)?["']?((?:\s+-{1,2}[A-Za-z][\w-]*(?:=\S+)?)*)\s+([a-z-]+)(?:\s+([a-z-]+))?/gi;
+
 export function classifyShellCommand(command = '') {
   if (/coordinate\.mjs\b[\s\S]*--stdin/i.test(command)) return { kind: 'wrapper' };
-  const match = maskQuotedArguments(command)
-    .match(/(?:^|[\s;&|])(?:["'][^"']*[\\/])?herdr(?:\.exe)?["']?\s+([a-z-]+)(?:\s+([a-z-]+))?/i);
-  if (!match) return { kind: 'other' };
-  const operation = `${match[1].toLowerCase()} ${String(match[2] || '').toLowerCase()}`.trim();
-  return { kind: READ_COMMANDS.has(operation) ? 'read' : 'raw-mutation', operation };
+  const masked = maskQuotedArguments(command);
+  let sawRead = false;
+  let firstRead;
+  for (const match of masked.matchAll(INVOCATION)) {
+    // Leading flags are skipped so `herdr --json pane read` classifies on the
+    // real verb instead of denying a read as the operation "--json pane".
+    const operation = `${match[2].toLowerCase()} ${String(match[3] || '').toLowerCase()}`.trim();
+    if (!READ_COMMANDS.has(operation)) return { kind: 'raw-mutation', operation };
+    sawRead = true;
+    firstRead = firstRead ?? operation;
+  }
+  return sawRead ? { kind: 'read', operation: firstRead } : { kind: 'other' };
 }
 
 export function redactOutboundText(value = '') {
@@ -75,6 +102,22 @@ export function redactOutboundText(value = '') {
     redacted,
     sha256: createHash('sha256').update(original).digest('hex'),
   };
+}
+
+// The audit match used to key on the message hash alone. Every action without
+// text hashes the empty string, so one audited `pane read` vouched for any
+// other command to the same target inside the window - including a mutation
+// the event never named, since the stored event carried no args at all. The
+// digest binds the whole executed shape, so an attempt authorizes exactly the
+// command it recorded.
+export function requestDigest(request = {}) {
+  const canonical = JSON.stringify({
+    origin: request.origin ?? null,
+    action: request.action ?? null,
+    args: Array.isArray(request.args) ? request.args : [],
+    target: { type: request.target?.type ?? null, id: request.target?.id ?? null },
+  });
+  return createHash('sha256').update(canonical).digest('hex');
 }
 
 export function validateCoordinationRequest(request) {

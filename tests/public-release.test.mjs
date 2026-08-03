@@ -118,14 +118,12 @@ test('retired product state identity appears only in migration history', async (
 test('CLAUDE.md and AGENTS.md point at the skill instead of copying it', async () => {
   // The doctrine has exactly one home. These files carry a link and this
   // repository's own facts; a second copy is what the three-file sync tax was.
-  const headings = [
-    '## Stacking Work Across Lanes',
-    '## Merge Train Coordination',
-    '## Agent Status as a Coordination Signal',
-    '## Coordination Transport Reliability',
-    '## Routing Substance and Pointers',
-    '## Durable Record Setup',
-  ];
+  // Derived from SKILL.md at runtime so a renamed section cannot silently fall
+  // out of the guard, which is what happened to "Agent Status as a Coordination
+  // Signal" when it became "Peer Liveness as a Coordination Signal".
+  const skill = (await readFile(join(root, `${skillRoot}/SKILL.md`), 'utf8')).replaceAll('\r\n', '\n');
+  const headings = skill.split('\n').filter((line) => line.startsWith('## '));
+  assert.ok(headings.length >= 10, 'expected SKILL.md to still have its section structure');
   for (const path of ['CLAUDE.md', 'AGENTS.md']) {
     const content = await readFile(join(root, path), 'utf8');
     for (const heading of headings) {

@@ -2,7 +2,7 @@
 
 ## Request contract
 
-Pipe one literal JSON object directly to `scripts/coordinate.mjs --stdin`, through a quoted POSIX heredoc or a single-quoted PowerShell here-string. Under Claude Code the heredoc via the Bash tool is required: the PowerShell tool's string-to-native pipe prepends a UTF-8 BOM that breaks `--stdin` JSON parsing. Keep the JSON on one line, and do not append a pipe or redirect to the heredoc — the hook rejects both. Resolve the wrapper's own path per session rather than reusing a pinned one; see the Example in SKILL.md.
+Pipe one literal JSON object directly to `scripts/coordinate.mjs --stdin`, through a quoted POSIX heredoc or a single-quoted PowerShell here-string. Under Claude Code the heredoc via the Bash tool is required: the PowerShell tool's string-to-native pipe prepends a UTF-8 BOM that breaks `--stdin` JSON parsing. Keep the JSON on one line, and do not append a pipe or redirect to the heredoc — the hook rejects both. Resolve the wrapper's own path per session rather than reusing a pinned one; see "Locate the wrapper first" in herdr-integration.md.
 
 | Field | Required | Value |
 |---|---:|---|
@@ -17,7 +17,7 @@ For `proactive`, `args` must be exactly `['agent', 'send', targetId, message]`; 
 
 ## Probe failures
 
-The existence check runs only for `proactive`; `user-directed` is authorized by the user and is not gated on it. Two distinct failures must not be conflated, because only the first says anything about the target:
+The existence check runs only for `proactive`. `user-directed` is not gated on existence, but any request that submits text is still gated on a readable status, because a blocked pane cannot be ruled out from an unreadable one. Two distinct failures must not be conflated, because only the first says anything about the target:
 
 | Error | Meaning | Response |
 |---|---|---|
@@ -30,7 +30,7 @@ For `user-directed`, broader Herdr arguments are permitted because the user supp
 
 ## Audit behavior
 
-The profile hook records both attempted and succeeded/failed phases with sequence, timestamp, runtime, session/tool identifiers when available, origin, action, source pane, target, reason, redacted message, message SHA-256, and outcome summary. The source is the Herdr pane issuing the command; the target is the receiving pane or resource. Codex and Claude Code share the same JSONL log and localhost viewer.
+The profile hook records both attempted and succeeded/failed phases with sequence, timestamp, runtime, session/tool identifiers when available, origin, action, source pane, target, reason, redacted message and args, a request SHA-256 binding origin/action/args/target, the composer verdict, and outcome summary. The request digest is what an `attempted` event authorizes, so an attempt vouches only for the exact command it recorded. The source is the Herdr pane issuing the command; the target is the receiving pane or resource. Codex and Claude Code share the same JSONL log and localhost viewer.
 
 Read-only commands such as `api snapshot`, `pane read`, and `agent list` are not logged. A raw mutating Herdr command is denied; repeat it through the wrapper. Obvious tokens, passwords, API keys, bearer credentials, and private keys are blocked before execution and are not retained verbatim.
 

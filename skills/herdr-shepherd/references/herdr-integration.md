@@ -58,16 +58,18 @@ How well that check sees depends on the target's detection manifest:
 - **Claude panes are fully readable.** `agent explain <id> --json` exposes the composer as the `prompt_box_body` region preview whatever state won detection, so it reads from a working pane too. An empty composer previews as the bare prompt glyph; anything else is a draft.
 - **Other agents are readable in one direction only.** Codex's manifest has no prompt box — it evaluates `osc_title`, `after_last_prompt_marker`, `whole_recent`, and `bottom_non_empty_lines(3)` — so the fallback is the `tab to queue message` hint, which a TUI renders only while text waits unsubmitted. That proves a dirty composer but can never prove a clean one: an empty composer and an unreadable one look identical.
 
-A send the check could not read carries `coordination-composer: unchecked` in its output and audit entry. Read that as *this send went out unguarded*, not as a clean composer.
+A send the check could not read carries `coordination-composer: unchecked` in its output, and the hook stores it as a `composer` field on the audit event. Read it as *this send went out unguarded*, not as a clean composer. `HERDR_SHEPHERD_ALLOW_DIRTY_COMPOSER=1` records `coordination-composer: bypassed` the same way, so an intentional override is never mistaken for a guarded send.
+
+The guards run for every request shape that pushes text into a pane — `agent send`, `pane run`, `pane send-text`, `agent prompt` — not only `agent send`, and on both origins. If the target's status cannot be read at all, the submit is refused rather than attempted, because a blocked pane cannot be ruled out from an unreadable status.
 
 ## Transport and delivery verdicts
 
 A send submits the message in one atomic `pane run` call — text plus Enter together, honoring the pane's bracketed-paste mode — and the wrapper derives a verdict from the target's status stream. Multi-line and long payloads arrive intact.
 
-- `confirmed` — an idle target started working. The only state that proves the submit landed.
+- `confirmed` — the target began a turn. Either it is `working` after the submit, or it went `idle` → `done`, which on this build only happens by running one.
 - `queued` — the target was already working; the message queued behind the running turn. Session read later to confirm it surfaced.
 - `unconfirmed` — the target did not start within the wait window. Session read before resending.
-- `unknown` — the probe itself failed.
+- `unknown` — a status probe failed, before or after the submit. A dropped control socket says nothing about the target, so it is never reported as `unconfirmed`.
 
 Only `confirmed` may be treated as delivered.
 

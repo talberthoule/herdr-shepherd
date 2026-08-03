@@ -15,7 +15,7 @@ import {
   runCli,
   wrapperIdentity,
 } from '../skills/herdr-shepherd/scripts/coordinate.mjs';
-import { appendAuditEvent, listAuditEvents, redactOutboundText } from '../skills/herdr-shepherd/scripts/core.mjs';
+import { appendAuditEvent, listAuditEvents, redactOutboundText, requestDigest } from '../skills/herdr-shepherd/scripts/core.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const fakeHerdr = join(here, 'fake-herdr.mjs');
@@ -36,7 +36,9 @@ function request(origin = 'proactive') {
 
 const stateDir = () => mkdtemp(join(tmpdir(), 'herdr-audit-enforcement-'));
 
-// Mirrors what the PreToolUse hook writes before the command runs.
+// Mirrors what the PreToolUse hook writes before the command runs. The match
+// key is the request digest, which binds origin, action, args, and target -
+// not the message hash, which every message-less request shares.
 async function seedAttempt(dir, overrides = {}) {
   return appendAuditEvent(dir, {
     phase: 'attempted',
@@ -45,6 +47,7 @@ async function seedAttempt(dir, overrides = {}) {
     action: 'herdr.exec',
     target: { type: 'agent', id: 'w2:p1' },
     message_sha256: redactOutboundText(MESSAGE).sha256,
+    request_sha256: requestDigest(request()),
     ...overrides,
   });
 }
@@ -78,14 +81,64 @@ test('the audit requirement can be bypassed only deliberately', async () => {
 
 test('an attempt for different content does not vouch for this send', async () => {
   const dir = await stateDir();
-  await seedAttempt(dir, { message_sha256: redactOutboundText('a different message').sha256 });
+  const other = { ...request(), args: ['agent', 'send', 'w2:p1', 'a different message'], message: 'a different message' };
+  await seedAttempt(dir, {
+    message_sha256: redactOutboundText('a different message').sha256,
+    request_sha256: requestDigest(other),
+  });
   await assert.rejects(() => assertAudited(request(), { stateDir: dir, env: {} }), /refusing to send unaudited/i);
 });
 
 test('an attempt for a different target does not vouch for this send', async () => {
   const dir = await stateDir();
-  await seedAttempt(dir, { target: { type: 'agent', id: 'w2:pZ' } });
+  const other = { ...request(), args: ['agent', 'send', 'w2:pZ', MESSAGE], target: { type: 'agent', id: 'w2:pZ' } };
+  await seedAttempt(dir, { target: other.target, request_sha256: requestDigest(other) });
   await assert.rejects(() => assertAudited(request(), { stateDir: dir, env: {} }), /refusing to send unaudited/i);
+});
+
+test('an attempt for one message-less action does not vouch for a different one', async () => {
+  // Every action without text hashes the empty string, so keying the match on
+  // the message alone let one audited `pane read` authorize any other command
+  // to the same target inside the window - including a mutation the recorded
+  // event never named.
+  const dir = await stateDir();
+  const read = {
+    origin: 'user-directed',
+    action: 'herdr.exec',
+    args: ['pane', 'read', 'w2:p1'],
+    target: { type: 'pane', id: 'w2:p1' },
+    reason: 'read the pane',
+    message: '',
+  };
+  const mutation = { ...read, args: ['workspace', 'delete', 'w2'], reason: 'unrelated' };
+  assert.equal(
+    redactOutboundText(read.message).sha256,
+    redactOutboundText(mutation.message).sha256,
+    'the message hashes must collide, or this test is not exercising the hazard',
+  );
+  await seedAttempt(dir, {
+    origin: read.origin,
+    target: read.target,
+    message_sha256: redactOutboundText('').sha256,
+    request_sha256: requestDigest(read),
+  });
+  await assert.rejects(
+    () => assertAudited(mutation, { stateDir: dir, env: {} }),
+    /refusing to send unaudited/i,
+    'an audited read must not authorize an unrelated mutation',
+  );
+});
+
+test('a future-dated attempt does not vouch for this send', async () => {
+  // Math.abs let an attempt dated ahead of now match, so clock skew silently
+  // doubled the effective window.
+  const dir = await stateDir();
+  const event = await seedAttempt(dir);
+  const past = Date.parse(event.occurred_at) - AUDIT_MATCH_WINDOW_MS;
+  await assert.rejects(
+    () => assertAudited(request(), { stateDir: dir, env: {}, now: past }),
+    /refusing to send unaudited/i,
+  );
 });
 
 test('a slow permission approval does not read as a missing audit', async () => {

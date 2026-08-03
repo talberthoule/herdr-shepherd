@@ -3,7 +3,13 @@ import { readFile } from 'node:fs/promises';
 import { basename, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { defaultStateDir, listAuditEvents, redactOutboundText, validateCoordinationRequest } from './core.mjs';
+import {
+  defaultStateDir,
+  listAuditEvents,
+  redactOutboundText,
+  requestDigest,
+  validateCoordinationRequest,
+} from './core.mjs';
 
 const wait = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
 
@@ -24,6 +30,7 @@ export const WRAPPER_MARKER = 'coordination-wrapper';
 // as a missing audit. A stale vouch requires an identical origin, target, and
 // message, which is close to harmless; a false refusal blocks coordination.
 export const AUDIT_MATCH_WINDOW_MS = 900_000;
+export const CLOCK_SKEW_TOLERANCE_MS = 5_000;
 
 // Silence must mean exactly one thing: the wrapper never ran. Every run
 // therefore names which wrapper ran and from where, so a stale path or a
@@ -41,12 +48,19 @@ export async function wrapperIdentity(scriptPath = fileURLToPath(import.meta.url
 }
 
 export function findAuditedAttempt(events, request, now = Date.now(), windowMs = AUDIT_MATCH_WINDOW_MS) {
-  const { sha256 } = redactOutboundText(request.message || '');
-  return events.find((event) => event.phase === 'attempted'
-    && event.origin === request.origin
-    && event.target?.id === request.target?.id
-    && event.message_sha256 === sha256
-    && Math.abs(now - Date.parse(event.occurred_at)) <= windowMs);
+  const digest = requestDigest(request);
+  return events.find((event) => {
+    if (event.phase !== 'attempted') return false;
+    // request_sha256 binds origin, action, args, and target together. An event
+    // without it predates this binding and must not vouch for anything: the
+    // old key was the message hash alone, which every message-less request
+    // shared.
+    if (event.request_sha256 !== digest) return false;
+    const age = now - Date.parse(event.occurred_at);
+    // Only the past counts. Math.abs let an attempt dated into the future match,
+    // so clock skew silently doubled the window.
+    return age >= -CLOCK_SKEW_TOLERANCE_MS && age <= windowMs;
+  });
 }
 
 // An audit requirement that degrades to best-effort is indistinguishable from no
@@ -111,7 +125,7 @@ const TRANSPORTS = new Set(['keystrokes', 'pane-run', 'agent-prompt']);
 function resolveTransport(options, env) {
   const transport = options.transport || env.HERDR_SHEPHERD_TRANSPORT || 'pane-run';
   if (!TRANSPORTS.has(transport)) {
-    throw new Error(`unknown coordination transport: ${transport} (expected keystrokes or agent-prompt)`);
+    throw new Error(`unknown coordination transport: ${transport} (expected ${[...TRANSPORTS].join(', ')})`);
   }
   return transport;
 }
@@ -130,6 +144,7 @@ const PROMPT_GLYPH = /^[\s ]*[❯>][\s ]*/u;
 // composer it never read as clean. The queue hint is the agent-agnostic
 // fallback: a TUI renders it only while text sits unsubmitted in the composer.
 const QUEUE_HINT = /\btab to queue message\b/i;
+const COMPOSER_REGION = /^(?:bottom_non_empty_lines|prompt_box)/i;
 
 // Reports whether the composer could be read at all, separately from what it
 // held. An unreadable composer must never be reported as a clean one.
@@ -139,7 +154,14 @@ export function composerState(stdout) {
   const rules = Array.isArray(parsed.evaluated_rules) ? parsed.evaluated_rules : [];
   const box = rules.find((rule) => rule?.region === PROMPT_BOX_REGION)?.evidence?.region_preview;
   if (typeof box === 'string') return { checked: true, draft: box.replace(PROMPT_GLYPH, '').trim() || null };
-  const previews = rules.map((rule) => rule?.evidence?.region_preview).filter((preview) => typeof preview === 'string');
+  // Scoped to the composer region only. Scanning every preview meant any pane
+  // merely *displaying* the phrase - `whole_recent` showing this repo's own
+  // docs, which quote it verbatim - was scored as holding a draft and became
+  // permanently un-sendable-to. A false refusal blocks coordination.
+  const previews = rules
+    .filter((rule) => COMPOSER_REGION.test(String(rule?.region ?? '')))
+    .map((rule) => rule?.evidence?.region_preview)
+    .filter((preview) => typeof preview === 'string');
   if (previews.some((preview) => QUEUE_HINT.test(preview))) {
     return { checked: true, draft: 'an unsubmitted message (queue hint visible)' };
   }
@@ -195,6 +217,75 @@ function run(command, args, env, timeoutMs) {
   });
 }
 
+// Anything that pushes text into a pane, whatever CLI shape it takes. The
+// guards used to key on `agent send` alone while the wrapper's own transport
+// was `pane run`, so the identical submit was reachable unguarded.
+const SUBMIT_SHAPED = [['agent', 'send'], ['agent', 'prompt'], ['pane', 'run'], ['pane', 'send-text']];
+
+export function isSubmitShaped(args = []) {
+  return SUBMIT_SHAPED.some(([resource, verb]) => args[0] === resource && args[1] === verb);
+}
+
+async function guardSubmit({ command, prefixArgs, env, options, request, statusBefore, probedBefore }) {
+  let status = statusBefore;
+  if (!probedBefore) {
+    const before = await probeAgent(() => run(command, [...prefixArgs, 'agent', 'get', request.target.id], env), options);
+    // Fails closed. This probe used to be non-fatal, so a dropped control socket
+    // left the status null and the blocked refusal below could not fire - on
+    // the one origin that has no other gate. An unreadable status is not a safe
+    // basis for submitting, because a submit into a blocked pane answers its
+    // pending prompt with the default option and discards the text.
+    if (before.failure) {
+      throw new Error(
+        `refusing to submit to ${request.target.id}: its status could not be read (${probeDetail(before.result)}). `
+        + 'A blocked pane cannot be ruled out, and a submit into one answers its pending prompt '
+        + `with the default option. Confirm with \`herdr agent get ${request.target.id}\` and retry.`,
+      );
+    }
+    status = agentStatus(before.result.stdout);
+  }
+  // Verified live: a submit into a blocked pane does not sit in the composer.
+  // The Enter answers the pending prompt with its default option and the text
+  // is discarded - the send silently takes a decision on the user's behalf.
+  // Deliberate modal interaction must use explicit send-keys.
+  if (status === 'blocked') {
+    throw new Error(
+      `refusing to submit: ${request.target.id} is blocked on user input. `
+      + 'A submit would answer its pending prompt with the default option and discard the message. '
+      + 'Resolve the prompt (or have the user answer it), then retry.',
+    );
+  }
+  // A bypass that leaves no trace is indistinguishable from a guarded send, so
+  // the override announces itself the way `audit=bypassed` does.
+  if (env.HERDR_SHEPHERD_ALLOW_DIRTY_COMPOSER === '1') {
+    return { statusBefore: status, composerNotice: `${COMPOSER_MARKER}: bypassed (HERDR_SHEPHERD_ALLOW_DIRTY_COMPOSER)\n` };
+  }
+  // A submit merges with an unsubmitted draft and force-submits both as one
+  // message, so a half-typed human thought becomes a prompt nobody chose to
+  // send. Only a positive reading refuses: an explain that fails or cannot be
+  // parsed leaves the composer unknown, and a false refusal blocks coordination
+  // for a hazard that may not be there.
+  const explained = await run(command, [...prefixArgs, 'agent', 'explain', request.target.id, '--json'], env);
+  const { checked, draft } = explained.exitCode === 0
+    ? composerState(explained.stdout)
+    : { checked: false, draft: null };
+  if (draft) {
+    const excerpt = draft.length > 80 ? `${draft.slice(0, 80)}…` : draft;
+    throw new Error(
+      `refusing to submit: ${request.target.id} holds an unsubmitted composer draft (${excerpt}). `
+      + 'A submit would merge with it and force-submit both as one message. '
+      + 'Have the draft submitted or cleared, or set HERDR_SHEPHERD_ALLOW_DIRTY_COMPOSER=1 '
+      + 'once the user has accepted the merge.',
+    );
+  }
+  // Silence would claim a clean composer the check never read. Say so instead,
+  // so the operator knows this submit went out unguarded.
+  return {
+    statusBefore: status,
+    composerNotice: checked ? '' : `${COMPOSER_MARKER}: unchecked (no readable composer region for ${request.target.id})\n`,
+  };
+}
+
 export async function executeCoordinationRequest(request, options = {}) {
   validateCoordinationRequest(request);
   const command = options.command || process.env.HERDR_BIN || (process.platform === 'win32' ? 'herdr.exe' : 'herdr');
@@ -219,6 +310,20 @@ export async function executeCoordinationRequest(request, options = {}) {
     statusBefore = agentStatus(check.stdout);
     probedBefore = true;
   }
+  // Every request that pushes text into a pane runs the pre-flight guards, not
+  // only `agent send`. The wrapper's own transport is `pane run`, so a
+  // user-directed ['pane','run',id,text] performed the identical submit with no
+  // blocked check and no composer check - and because raw Herdr mutations are
+  // denied in the shell, the wrapper was the only available path and it was the
+  // unguarded one.
+  let composerNotice = '';
+  if (isSubmitShaped(request.args)) {
+    const guarded = await guardSubmit({
+      command, prefixArgs, env, options, request, statusBefore, probedBefore,
+    });
+    statusBefore = guarded.statusBefore;
+    composerNotice = guarded.composerNotice;
+  }
   if (request.args[0] === 'agent' && request.args[1] === 'send') {
     const sourcePane = env.HERDR_PANE_ID;
     let sourceLabel;
@@ -228,49 +333,6 @@ export async function executeCoordinationRequest(request, options = {}) {
     }
     const source = sourceLabel ? `"${String(sourceLabel).replace(/\s+/g, ' ').trim()}" (${sourcePane})` : sourcePane || 'another session';
     const text = `[Herdr from ${source}] ${request.message}`;
-    // Retried for the same reason as the proactive gate, but never fatal here:
-    // an unresolved status degrades the verdict to unknown rather than blocking
-    // a send the caller is already authorized to make.
-    if (!probedBefore) {
-      const before = await probeAgent(() => run(command, [...prefixArgs, 'agent', 'get', request.target.id], env), options);
-      statusBefore = agentStatus(before.result.stdout);
-    }
-    // Verified live: a send into a blocked pane does not sit in the composer.
-    // The typed Enter answers the pending prompt with its default option and
-    // the message text is discarded - the send silently takes a decision on
-    // the user's behalf. Refuse on every transport; deliberate modal
-    // interaction must use explicit send-keys, never a message send.
-    if (statusBefore === 'blocked') {
-      throw new Error(
-        `refusing to send: ${request.target.id} is blocked on user input. `
-        + 'A send would answer its pending prompt with the default option and discard the message. '
-        + 'Resolve the prompt (or have the user answer it), then resend.',
-      );
-    }
-    // A send merges with an unsubmitted draft and force-submits both as one
-    // message, so a half-typed human thought becomes a prompt nobody chose to
-    // send. Only a positive reading refuses: an explain that fails or cannot be
-    // parsed leaves the composer unknown, and a false refusal blocks
-    // coordination for a hazard that may not be there.
-    let composerNotice = '';
-    if (env.HERDR_SHEPHERD_ALLOW_DIRTY_COMPOSER !== '1') {
-      const explained = await run(command, [...prefixArgs, 'agent', 'explain', request.target.id, '--json'], env);
-      const { checked, draft } = explained.exitCode === 0
-        ? composerState(explained.stdout)
-        : { checked: false, draft: null };
-      // Silence would claim a clean composer the check never read. Say so
-      // instead, so the operator knows this send went out unguarded.
-      if (!checked) composerNotice = `${COMPOSER_MARKER}: unchecked (no readable composer region for ${request.target.id})\n`;
-      if (draft) {
-        const excerpt = draft.length > 80 ? `${draft.slice(0, 80)}…` : draft;
-        throw new Error(
-          `refusing to send: ${request.target.id} holds an unsubmitted composer draft (${excerpt}). `
-          + 'A send would merge with it and force-submit both as one message. '
-          + 'Have the draft submitted or cleared, or set HERDR_SHEPHERD_ALLOW_DIRTY_COMPOSER=1 '
-          + 'once the user has accepted the merge.',
-        );
-      }
-    }
     // Wrapped so the composer notice is attached once, at the single exit,
     // rather than at each transport's several returns.
     const submitViaTransport = async () => {
@@ -299,8 +361,13 @@ export async function executeCoordinationRequest(request, options = {}) {
       // a turn. done-before to done-after stays honestly unconfirmed.
       const after = await probeAgent(() => run(command, [...prefixArgs, 'agent', 'get', request.target.id], env), options);
       const statusAfter = agentStatus(after.result.stdout);
-      const verdict = ACTIVE_STATUS.has(statusAfter) || (statusBefore === 'idle' && statusAfter === 'done')
-        ? 'confirmed' : 'unconfirmed';
+      // A failed after-probe says nothing about the target, so it is `unknown`
+      // rather than `unconfirmed`. Reporting it as unconfirmed told the operator
+      // the message never landed and invited the resend of a delivered message.
+      const verdict = statusAfter === null
+        ? 'unknown'
+        : (ACTIVE_STATUS.has(statusAfter) || (statusBefore === 'idle' && statusAfter === 'done')
+          ? 'confirmed' : 'unconfirmed');
       return { ...submitted, stdout: `${submitted.stdout}\n${DELIVERY_MARKER}: ${verdict}\n` };
     }
     if (transport === 'agent-prompt') {
@@ -345,7 +412,8 @@ export async function executeCoordinationRequest(request, options = {}) {
     const sent = await submitViaTransport();
     return composerNotice ? { ...sent, stdout: `${composerNotice}${sent.stdout}` } : sent;
   }
-  return run(command, [...prefixArgs, ...request.args], env);
+  const raw = await run(command, [...prefixArgs, ...request.args], env);
+  return composerNotice ? { ...raw, stdout: `${composerNotice}${raw.stdout}` } : raw;
 }
 
 async function stdin() {
