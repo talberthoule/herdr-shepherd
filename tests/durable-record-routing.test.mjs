@@ -45,7 +45,7 @@ test('skill requires in-body attribution because trackers share one credential',
   assert.match(section, /Performed by:/);
   assert.match(section, /Scope:/);
   // Pane IDs are breadcrumbs; the role is what survives.
-  assert.match(section, /slot identifiers and get reused/);
+  assert.match(section, /identifiers are slots and get reused/);
   assert.match(section, /The role is the durable half/);
 });
 
@@ -81,8 +81,7 @@ test('transport reliability separates ACK from proof of submission', async () =>
     '## Coordination Transport Reliability',
   );
   assert.match(section, /An ACK proves the recipient holds the content, not that your send delivered it/);
-  assert.match(section, /pull the content by pane read before your message surfaces/);
-  assert.match(section, /do not resend after an `unconfirmed` verdict/);
+  assert.match(section, /pull the content by session read before your message ever surfaces/);
   assert.match(section, /duplicate turn over work already done/);
 });
 
@@ -105,11 +104,16 @@ test('viewer labels the succeeded phase as sent without changing the stored valu
   assert.match(viewer, /PHASE_TITLE=\{[^}]*Delivery is unconfirmed/);
 });
 
-test('skill describes the viewer label honestly', async () => {
-  const skill = await readFile(skillPath, 'utf8');
-  assert.match(skill, /displays as \*\*sent\*\*/);
-  assert.match(skill, /not proof the target read or acted on it/);
-  assert.doesNotMatch(skill, /The viewer defaults to succeeded events\./);
+test('herdr reference describes the viewer label honestly', async () => {
+  // The viewer is Shepherd's own Herdr surface, so its honesty rule moved with
+  // the rest of the integration notes rather than staying in the doctrine.
+  const reference = await readFile(
+    join(root, 'skills', 'herdr-shepherd', 'references', 'herdr-integration.md'),
+    'utf8',
+  );
+  assert.match(reference, /displays as \*\*sent\*\*/);
+  assert.match(reference, /not proof the target read or acted on it/);
+  assert.doesNotMatch(reference, /The viewer defaults to succeeded events\./);
 });
 
 

@@ -18,6 +18,7 @@ test('public repository contains both plugin manifests and one canonical skill r
     `${skillRoot}/SKILL.md`,
     `${skillRoot}/agents/openai.yaml`,
     `${skillRoot}/references/command-policy.md`,
+    `${skillRoot}/references/herdr-integration.md`,
     `${skillRoot}/scripts/hook.mjs`,
     `${skillRoot}/scripts/coordinate.mjs`,
     'install.ps1',
