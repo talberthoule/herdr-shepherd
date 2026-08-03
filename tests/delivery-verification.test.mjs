@@ -117,10 +117,21 @@ test('viewer renders the delivery verdict with its own explanation', async () =>
   assert.match(viewer, /dl-'\+esc\(e\.delivery\)/);
 });
 
-test('skill documents the delivery verdicts', async () => {
-  const skill = await readFile(skillPath, 'utf8');
+test('the herdr reference documents the delivery verdicts', async () => {
+  // Verdict names are Herdr's, produced by this wrapper against Herdr status,
+  // so they live with the integration notes rather than the tool-neutral skill.
+  const reference = await readFile(
+    join(here, '..', 'skills', 'herdr-shepherd', 'references', 'herdr-integration.md'),
+    'utf8',
+  );
   for (const verdict of ['confirmed', 'unconfirmed', 'queued', 'unknown']) {
-    assert.match(skill, new RegExp(`\`${verdict}\``), `missing "${verdict}" verdict`);
+    assert.match(reference, new RegExp(`\`${verdict}\``), `missing "${verdict}" verdict`);
   }
-  assert.match(skill, /probes the target's status before the send/);
+  assert.match(reference, /derives a verdict from the target's status stream/);
+});
+
+test('the skill still requires a verdict without naming one tool s vocabulary', async () => {
+  const skill = await readFile(skillPath, 'utf8');
+  assert.match(skill, /Establish a delivery verdict rather than assuming one/);
+  assert.match(skill, /Only positive evidence that the peer began a new turn counts as delivered/);
 });

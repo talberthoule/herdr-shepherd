@@ -29,7 +29,7 @@ test('skill documents capability-aware helper restart handoffs', async () => {
   const skill = await readFile(skillPath, 'utf8');
   assert.match(skill, /Capability-Aware Helper Handoffs/);
   assert.match(skill, /already-capable helper/);
-  assert.match(skill, /Never restart the coordinating pane/);
+  assert.match(skill, /Never restart the coordinating session/);
   assert.match(skill, /confirm the fresh helper exposes the capability/i);
 });
 

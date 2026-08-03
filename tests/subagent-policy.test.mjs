@@ -7,7 +7,7 @@ import test from 'node:test';
 const here = dirname(fileURLToPath(import.meta.url));
 const skillPath = join(here, '..', 'skills', 'herdr-shepherd', 'SKILL.md');
 
-const heading = '## Herdr Instance vs Subagent';
+const heading = '## Peer Session vs Subagent';
 
 function extractSection(raw) {
   const markdown = raw.replaceAll('\r\n', '\n');
@@ -19,10 +19,16 @@ function extractSection(raw) {
 }
 
 test('skill scopes sub-agent launching by runtime', async () => {
-  const skill = await readFile(skillPath, 'utf8');
-  const section = extractSection(skill);
+  const section = extractSection(await readFile(skillPath, 'utf8'));
   assert.match(section, /Default to a subagent for helper work/);
   assert.match(section, /running Claude has first-class subagents/);
   assert.match(section, /Codex and other runtimes/);
-  assert.match(section, /unless no other Herdr tab is open to coordinate with/);
+  assert.match(section, /unless no peer session is open to coordinate with/);
+});
+
+test('the split rule is stated in peer terms, not one tool s terms', async () => {
+  const section = extractSection(await readFile(skillPath, 'utf8'));
+  assert.match(section, /durable lane/);
+  assert.match(section, /Do not split at all when the task is small/);
+  assert.doesNotMatch(section, /Herdr instance/, 'the doctrine must not assume a specific multiplexer');
 });

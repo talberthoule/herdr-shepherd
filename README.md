@@ -2,17 +2,19 @@
 
 Multiple agents can move faster than one agent, but only when they can see who owns each lane. Without that shared context, parallel work turns into duplicate edits, stale plans, hidden terminal state, and risky Git moves.
 
-Herdr Shepherd is a Codex and Claude Code plugin for using Herdr as shared working context. It gives each session a local protocol for discovering active work, avoiding duplicate edits, choosing between inline work, helper subagents, and visible Herdr lanes, sending source-attributed handoffs, and reviewing a token-protected activity trail.
+Herdr Shepherd is a Codex and Claude Code plugin carrying the coordination doctrine for that problem: how to discover active and paused work, how to split one effort across lanes and merge them back, how to survive a shared git working tree, where findings must be written so they outlive a session, and how to send source-attributed handoffs with a delivery verdict rather than a hope.
 
-It is deliberately small: Herdr remains the coordination layer, and this project adds skill instructions plus audited hooks around the Herdr CLI.
+That doctrine is deliberately runtime-agnostic — it is about lanes, branches, records, and ownership, not about any one tool. Driving a specific multiplexer is that tool's own job: for Herdr work, install the [native Herdr skill](https://github.com/ogulcancelik/herdr) and this plugin will defer to it for CLI mechanics rather than duplicating them. What this plugin adds on top is the part Herdr does not have — an audited mutation wrapper, delivery verdicts, and refusals for two hazards that otherwise let a send take a decision the user never made.
+
+Without the native Herdr skill the policy half still applies in full; only the Herdr-driving capabilities degrade, and the skill says so plainly instead of improvising CLI syntax.
 
 ## What, So What, Now What
 
 | Question | Answer |
 |---|---|
-| What? | A coordination skill plus audited hooks for Codex and Claude Code sessions working inside Herdr. |
+| What? | A runtime-agnostic coordination skill, plus audited hooks and a Herdr integration layer for Codex and Claude Code sessions. |
 | So what? | Teams can add agent processing power without losing ownership, context, handoff traceability, or shared-worktree safety. |
-| Now what? | Install the plugin, ask new sessions to use it before shared-repo work, and let the skill decide when to stay inline, use a subagent, or branch into another visible Herdr lane. |
+| Now what? | Install the plugin, add the native Herdr skill if you use Herdr, and let the skill decide when to stay inline, use a subagent, or branch into another visible lane. |
 
 ## Install
 

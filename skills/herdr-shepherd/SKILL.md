@@ -1,61 +1,57 @@
 ---
 name: herdr-shepherd
-description: Use when a user references Herdr spaces, workspaces, tabs, panes, agents, paused work, handoffs, or duplicate effort; or when unexplained Git state suggests parallel work, such as an unexpected branch or HEAD, unfamiliar dirty files, files changing during inspection, a shared worktree, or another active tool or agent.
+description: Use when work may be running in parallel with other agent sessions — a shared git working tree, an unexpected branch or HEAD, files changing during inspection, fanning one effort across lanes, merging several lanes into one branch, handoffs, paused work, or suspected duplicate effort. Also use when coordinating peer sessions through a multiplexer such as Herdr, including its spaces, workspaces, tabs, panes, and agents.
 ---
 
-# Herdr Shepherd
+# Shepherd
 
-## Overview
+Coordination doctrine for several agents working the same repository at once. It is about who owns what, how work is split and rejoined, and which claims can be trusted — not about driving any particular tool. Where a specific multiplexer is in play, that tool's own skill owns its mechanics; see Working With a Session Multiplexer.
 
-Treat Herdr as shared working context. Inspect relevant tabs before searching elsewhere or repeating work; coordinate proactively when an existing agent can prevent duplication or unblock a handoff.
+Three terms are used throughout, deliberately tool-neutral:
+
+- **Peer session** — another agent working the same repository: a second terminal, a multiplexer pane, a cloud agent. Anything that holds its own context and can act on its own.
+- **Session read** — a pull-based read of a peer's transcript or screen. It is the only channel that cannot be dropped, because you fetch it rather than waiting for it.
+- **Send** — pushing a message into a peer's input. Always lossy to some degree, which is why substance never travels this way alone.
 
 ## Suspected Parallel Work
 
-Run a silent Herdr check when at least one concrete signal suggests another writer: an unexpected branch or `HEAD`, unfamiliar changes that may overlap the task, a file changing during inspection, or explicit evidence of another active tool, agent, or shared worktree. A dirty tree by itself, expected user edits, and unrelated generated files are not enough.
+Check for a peer when at least one concrete signal suggests another writer: an unexpected branch or `HEAD`, unfamiliar changes that may overlap the task, a file changing during inspection, or explicit evidence of another active tool, agent, or shared worktree. A dirty tree by itself, expected user edits, and unrelated generated files are not enough.
 
-1. Snapshot Herdr and narrow candidates to panes whose cwd or worktree belongs to the same repository.
-2. Rank those candidates by status before spending reads: `working` panes are active writers and are read first, `blocked` panes are stalled on a human and get surfaced rather than messaged, `idle` and `done` panes are dormant and are the handoff candidates. Status orders the queue; it never settles overlap.
-3. Read likely owners' actual plans before inferring overlap from tab labels or filenames.
+1. Enumerate peer sessions and narrow to those whose working directory or worktree belongs to the same repository.
+2. Rank the candidates by liveness before spending reads: a peer mid-turn is an active writer and is read first, a peer blocked on human input is surfaced to the user rather than messaged, and an idle peer is the handoff candidate. Liveness orders the queue; it never settles overlap.
+3. Read likely owners' actual plans before inferring overlap from labels or filenames.
 4. If no same-repository ownership or task overlap appears, continue silently without messaging.
-5. If target-file overlap is confirmed or ownership remains unclear, coordinate before editing or mutating Git state.
+5. If target-file overlap is confirmed or ownership remains unclear, coordinate before editing or mutating git state.
 
-## Workflow
+Read-only inspection is silent: it costs the peer nothing and needs no announcement.
 
-1. Run `herdr api snapshot` immediately.
-2. Identify relevant workspace, tab, pane, and agent IDs from labels and status.
-3. Read likely panes with `herdr pane read <pane-id> --source recent-unwrapped`. Read more than one when ownership is unclear.
-4. Continue the work locally when no handoff is needed — but if the repo's working tree is shared, first confirm you may hold it (see Shared Git Working Trees).
-5. Send a proactive message when an existing relevant agent owns paused work, has context worth preserving, or should avoid duplicating current work.
+## Peer Session vs Subagent
 
-Read-only inspection is silent: it creates no audit entry and opens no viewer.
+Default to a subagent for helper work that is parent-owned and disposable: read code, inspect logs, compare options, review a diff, summarize docs, or investigate a failing test. Use a peer session when the work needs a durable lane: it may edit files, run a dev server, hold browser or app state, use a separate worktree, continue after the parent moves on, receive user input directly, or preserve context from paused work.
 
-## Herdr Instance vs Subagent
+Prefer an existing peer session over a fresh subagent when it already owns relevant context, files, processes, or a plan. Do not split at all when the task is small, tightly coupled, or cheaper to finish inline than to coordinate.
 
-Default to a subagent for helper work that is parent-owned and disposable: read code, inspect logs, compare options, review a diff, summarize docs, or investigate a failing test. Use another Herdr instance in the same space when the work needs a durable lane: it may edit files, run a dev server, hold browser or app state, use a separate worktree, continue after the parent moves on, receive user input directly, or preserve context from paused work.
-
-Prefer an existing Herdr instance over a fresh subagent when it already owns relevant context, files, processes, or a plan. Do not split at all when the task is small, tightly coupled, or cheaper to finish inline than coordinate.
-
-Runtime capability changes the default. An agent running Claude has first-class subagents and is encouraged to use them while coordinating completion of its tasks. Codex and other runtimes should refrain from launching sub-agents unless no other Herdr tab is open to coordinate with.
+Runtime capability changes the default. An agent running Claude has first-class subagents and is encouraged to use them while coordinating completion of its tasks. Codex and other runtimes should refrain from launching sub-agents unless no peer session is open to coordinate with.
 
 | Situation | Use |
 |---|---|
 | Quick read-only investigation | Subagent |
 | Independent code review | Subagent |
 | Summarize logs, docs, or issues | Subagent |
-| Existing pane already owns the work | Same Herdr instance |
-| Parallel file edits | Herdr instance with isolated worktree |
-| Needs dev server, browser, or live app state | Herdr instance |
-| Long-running or pausable work | Herdr instance |
-| Cross-runtime coordination, e.g. Codex + Claude | Herdr instance |
+| A peer already owns the work | That peer session |
+| Parallel file edits | Peer session with an isolated worktree |
+| Needs dev server, browser, or live app state | Peer session |
+| Long-running or pausable work | Peer session |
+| Cross-runtime coordination, e.g. Codex + Claude | Peer session |
 | Small local change | Neither |
 
 ## Capability-Aware Helper Handoffs
 
-When the current session lacks a capability such as Browser, Computer Use, or freshly installed software, do not stop at the local boundary. Snapshot Herdr, read likely helper panes, and ask an existing helper to confirm both capability and idle/disposable status before delegating.
+When the current session lacks a capability such as Browser, Computer Use, or freshly installed software, do not stop at the local boundary. Enumerate peers, read likely helpers, and ask one to confirm both the capability and its idle/disposable status before delegating.
 
-Prefer an already-capable helper. If a helper needs install or restart, use only a pane the user explicitly authorizes as disposable, keep the coordinating pane alive, and run lifecycle operations through the audited wrapper with `origin: user-directed`. Never restart the coordinating pane or any pane with active, uncommitted, or irreplaceable work.
+Prefer an already-capable helper. If a helper needs install or restart, use only a session the user explicitly authorizes as disposable, keep the coordinating session alive, and run lifecycle operations through whatever audited path the multiplexer integration provides. Never restart the coordinating session or any session with active, uncommitted, or irreplaceable work.
 
-After restart, confirm the fresh helper exposes the capability before handing it the original task. Treat a sent prompt as queued work, not proof of execution: wait for pane status or returned evidence, then bring the result and ownership back to the coordinator.
+After restart, confirm the fresh helper exposes the capability before handing it the original task. Treat a sent prompt as queued work, not proof of execution: wait for liveness or returned evidence, then bring the result and ownership back to the coordinator.
 
 ## Shared Git Working Trees
 
@@ -65,7 +61,7 @@ Agents in the same repo usually share ONE git working tree. Git state is therefo
 - `git status` can show another agent's uncommitted edits.
 - Any `checkout`, `checkout -b`, `merge`, or `stash` sweeps their in-flight work onto your branch.
 
-Before your first git mutation or file edit, snapshot, then read `git branch --show-current` and `git status --short`. If another agent holds the tree, either **take an isolated worktree** (`git worktree add <path outside the repo and outside any synced folder> -b <branch> main`) or **take a lane that never touches the tree** (review, docs, issue-tracker hygiene).
+Before your first git mutation or file edit, check for peers, then read `git branch --show-current` and `git status --short`. If another agent holds the tree, either **take an isolated worktree** (`git worktree add <path outside the repo and outside any synced folder> -b <branch> main`) or **take a lane that never touches the tree** (review, docs, issue-tracker hygiene).
 
 Three corollaries that are easy to get wrong:
 
@@ -88,86 +84,61 @@ Also check whether the project's containers/toolchain bind the *main* checkout; 
 
 ## Stacking Work Across Lanes
 
-When one effort fans out into multiple lanes, stack git state, not processes. A lane is a branch plus a tracker issue, not a running pane: at any moment only a pane or two should be executing, while every other lane exists as a committed branch any agent can resume.
+When one effort fans out into multiple lanes, stack git state, not processes. A lane is a branch plus a tracker issue, not a running session: at any moment only a session or two should be executing, while every other lane exists as a committed branch any agent can resume.
 
 1. Commit every checkpoint on the lane's own branch. An uncommitted worktree can be resumed only by re-entering that exact worktree; a committed branch can be rebased, stacked on, reviewed, or deleted from anywhere.
 2. Keep stacks shallow: review and merge the foundation branch early, then base new lanes on the default branch. Branch B off feature branch A only when B genuinely needs A's code before A can merge.
 3. Independent work always branches from the default branch, never from a sibling feature branch, so an abandoned direction costs exactly one branch. When a base moves, restack dependents with `git rebase --update-refs`.
 4. A lane gets a running process — dev server, compose stack, benchmark container — only while actively needed. Pause a lane by committing and stopping its processes; a dormant worktree costs nothing. Keep runtime/integration testing centralized in the one checkout the toolchain binds.
-5. Record stack order and merge sequence in the shared tracker (for example Linear blocked-by relations), never only in pane scrollback, so the merge plan survives context loss on every pane.
+5. Record stack order and merge sequence in the shared tracker (for example Linear blocked-by relations), never only in a session's scrollback, so the merge plan survives context loss everywhere.
 6. Decide direction with a cheap plan or spec artifact before fanning out implementation lanes; fanning out first and choosing direction second is the most expensive way to learn the direction was wrong.
 
 ## Merge Train Coordination
 
 When multiple lanes converge on one default branch, run the merge as a train with a single integrator:
 
-1. One integrator pane owns default-branch merges, the tracker status table, and branch-name assignment. Lanes never touch the default branch or remotes, nothing is marked Done before independent review plus merge plus gates, and the integrator corrects premature Done.
+1. One integrator owns default-branch merges, the tracker status table, and branch-name assignment. Lanes never touch the default branch or remotes, nothing is marked Done before independent review plus merge plus gates, and the integrator corrects premature Done.
 2. Run a standing read-only review lane with a strict queue in which reviews preempt the reviewer's own implementation lane. In the verdict loop, BLOCK sends fixes to the owning lane on the same frozen branch and the new sha is re-reviewed. A reviewer never reviews its own branch — the integrator covers that.
 3. After every merge, re-run all gates and broadcast the moved default branch with its new sha to in-flight lanes so they rebase or branch from the current tip.
-4. When the user delegates pane confirmations, ration them: approve autonomously anything in-lane — a design consistent with the tracked issue, read-only inspection, test runs, commits on the lane's own branch, tracker updates. Always escalate remote pushes, default-branch mutations, data deletion, credentials or secrets, visibility changes, and scope expansion.
+4. When the user delegates confirmations, ration them: approve autonomously anything in-lane — a design consistent with the tracked issue, read-only inspection, test runs, commits on the lane's own branch, tracker updates. Always escalate remote pushes, default-branch mutations, data deletion, credentials or secrets, visibility changes, and scope expansion.
 5. Independent review is load-bearing, not ceremony: in one nine-lane train, 4 of 5 first-round reviews returned real blockers that lane-local green tests missed — zero-based test clocks versus production monotonic time, mocked lifecycles hiding races, best-effort rollback, and false-success reporting.
 
 ## Overlapping Loops
 
-Long-running loops are the main source of duplicated effort, and **labels lie** — two differently-named loops can be near-identical in scope. Read the other agent's pane for its *plan or todo list*, not just the files it has touched. If its plan already covers your task, do not race it: stand down to a non-conflicting lane and say so, recording the split in the shared tracker (Linear/Jira/etc.) so it survives context loss on both sides.
+Long-running loops are the main source of duplicated effort, and **labels lie** — two differently-named loops can be near-identical in scope. Read the other agent's session for its *plan or todo list*, not just the files it has touched. If its plan already covers your task, do not race it: stand down to a non-conflicting lane and say so, recording the split in the shared tracker (Linear/Jira/etc.) so it survives context loss on both sides.
 
-## Mutation Boundary
+## Peer Liveness as a Coordination Signal
 
-Proactive coordination may only request `herdr agent send` for an existing agent. The audited wrapper prefixes the source tab/pane, submits the message atomically, and records a delivery verdict; only a `confirmed` verdict or a later pane read supports claiming the agent resumed. Do not proactively start agents, run other pane commands, focus UI, close panes, rename items, or alter layout.
+Most multiplexers report some liveness state per peer — working, idle, blocked, unknown. It is worth ranking reads by and worth refusing to send on, but four properties bound how far to trust it:
 
-A direct user request may authorize broader Herdr actions. Mark those `user-directed`; they remain audited but do not auto-open the viewer.
+1. **Liveness says whether a peer is running a turn, never what it is running.** It orders your reads; it never establishes overlap. Read the plan.
+2. **A peer blocked on human input is unreachable by message.** Escalate it to the user; do not try to coordinate around it. On some tools a send to a blocked peer does worse than fail — see the multiplexer's integration notes.
+3. **"Unknown" is overloaded.** No agent present and detection failed usually report identically. Never read it as idle, and never send on the assumption that it is.
+4. **Liveness is often inferred, not reported.** Where a tool derives it by inspecting a peer's screen, the semantics can drift when either the tool or the peer's UI changes. Prefer a self-reported state where the tool offers one.
 
-Every mutation must use the audited wrapper. Read [references/command-policy.md](references/command-policy.md) before the first mutation in a turn. Raw Herdr mutations are denied by the profile hook, and the wrapper refuses to send at all when it cannot confirm the hook audited the attempt.
+### Sweep for blocked peers on every coordination wake
 
-## Agent Status as a Coordination Signal
+A blocked lane is stalled on a human and stays invisible until somebody looks. On each coordination wake, enumerate peers and surface every blocked one in the same repo or effort to the user, with its identifier and what it is asking. Escalation is the entire remedy — there is no coordination move that clears it.
 
-Herdr reports a status per agent, visible in `herdr api snapshot` and `herdr agent get <id>`. It is derived by matching detection rules against the pane's rendered screen, not reported by the agent, so `herdr agent explain <id> --json` — which names the rule that matched, the screen region behind it, and the manifest version used — is the tool for questioning a status you do not believe.
+### Check the input before sending
 
-| Status | Means | Use it for |
-|---|---|---|
-| `working` | Mid-turn | An active writer: read its plan before touching shared files, and expect a send to queue behind the running turn. |
-| `idle` | Awaiting input with a live composer | The only state a delivery verdict can be confirmed from, and the safe handoff candidate. |
-| `blocked` | Waiting on a human at a prompt or modal | Never send; surface it to the user. |
-| `done` | Finished a turn and wants attention | A UI attention state, not a lifecycle state. |
-| `unknown` | No agent detected, or detection failed | Ambiguous by construction; read the pane instead. |
+A send generally merges with whatever sits unsubmitted in the peer's input and submits both together, turning a half-typed human thought into a prompt nobody chose to send. Check before sending to any user-facing session, and suppress unsolicited routine chatter toward coordinator sessions a human is watching — lanes volunteer only substantive events: branch- or patch-ready with sha, verdicts, blockers, decision questions.
 
-Four properties decide how far to trust it:
-
-1. `idle`, `working`, `blocked`, and `unknown` are waitable; `done` is not. `herdr agent wait <id> --status done` is refused with "done is a UI attention state; use idle for CLI agent completion waits". Herdr's `done` also has nothing to do with a tracker's Done column — an agent that finished one turn is not a lane that passed review, and the merge train's Done rule is unaffected by it.
-2. Detection is screen-scraped against a versioned, remotely-updated manifest, so status semantics can drift when that manifest or the agent's own UI changes. An agent that must be trusted rather than guessed at can self-report with `pane report-agent`.
-3. `unknown` is overloaded: a pane running no recognized agent and a pane whose detection failed report identically. Never read it as idle, and never send to it on the assumption it is.
-4. Status says *whether* an agent is running a turn, never *what* it is running. It orders your reads; it never establishes overlap. Read the plan.
-
-### Sweep for blocked panes on every coordination wake
-
-A `blocked` lane is stalled on a human and stays invisible until somebody looks, and you cannot rescue it with a message: a send answers its pending prompt with the default option and discards your text. On each coordination wake, snapshot and surface every blocked pane in the same repo or effort to the user, with its pane ID and what it is asking. Escalation is the entire remedy — there is no coordination move that clears it.
-
-### Check the composer before sending
-
-A send merges with whatever sits unsubmitted in the target's composer and force-submits both as one message, turning a half-typed human thought into a prompt nobody chose to send. The audited wrapper checks for that before every send, on both origins, and refuses when it finds a draft; `HERDR_SHEPHERD_ALLOW_DIRTY_COMPOSER=1` overrides it, and is only for a merge the user has accepted.
-
-How well the check sees depends on the target's detection manifest, and the difference matters:
-
-- **Claude panes are fully readable.** `agent explain <id> --json` exposes the composer as the `prompt_box_body` region preview whatever state won detection, so it reads from a working pane too. An empty composer previews as the bare prompt glyph; anything else is a draft.
-- **Other agents are readable in one direction only.** Codex's manifest has no prompt box — it evaluates `osc_title`, `after_last_prompt_marker`, `whole_recent`, and `bottom_non_empty_lines(3)` — so the fallback is the `tab to queue message` hint, which a TUI renders only while text waits unsubmitted. That proves a dirty composer but can never prove a clean one: an empty composer and an unreadable one look identical.
-
-A send the check could not read carries `coordination-composer: unchecked` in its output and audit entry. Read that as *this send went out unguarded*, not as a clean composer — and never as grounds for a blind resend, which is the move that appends a duplicate to a composer already holding your last message.
+Where a tool can only detect a dirty input and never positively confirm a clean one, treat "could not tell" as *this send went out unguarded* — not as clean, and never as grounds for a blind resend, which is the move that appends a duplicate to an input already holding your last message.
 
 ## Coordination Transport Reliability
 
-A send submits the message into the target agent's session in one atomic `pane run` call — text plus Enter together, honoring the pane's bracketed-paste mode — and the wrapper derives a delivery verdict from the target's status stream. Multi-line and long payloads arrive intact on this transport; what stays uncertain is the target's state, not the typing. Field-tested rules:
+Sends are lossy. What is uncertain is rarely the typing; it is whether the peer received, surfaced, and acted on the message. Rules that hold regardless of transport:
 
-1. The wrapper submits the `message` field verbatim. Never put a placeholder there; `args` must mirror `message` exactly. Keep sends compact regardless of transport: write substance to the durable record first and send the pointer.
-2. The wrapper probes the target's status before the send and resolves the verdict event-driven afterward, recording it in the audit trail so delivery is assessed even when nobody checks. `confirmed` means an idle target started working, which is the only state that proves the submit landed. `queued` means the target was already working; the message queued behind the running turn, so pane read later to confirm it surfaced. `unconfirmed` means the target did not start within the wait window — pane read before resending. `unknown` means the probe itself failed. Only `confirmed` may be treated as delivered.
-3. Never send to a `blocked` target, and do not work around the wrapper's refusal: verified live, the submit's Enter answers the pane's pending prompt with its default option and the message text is discarded — the send silently takes a decision on the user's behalf. Resolve the prompt first; deliberate modal interaction is explicit `send-keys`, never a message send.
-4. A send merges with an unsubmitted composer draft and force-submits both as one message. Pane read shows the composer line, so check it before sending to a user-facing pane, and suppress unsolicited routine chatter toward user-facing coordinator panes — lanes volunteer only substantive events (branch- or patch-ready with sha, verdicts, blockers, decision questions).
-5. A message explicitly marked ACK-requested still requires a compact ACK: a `queued` verdict cannot distinguish delivered from still-pending, and silence proves nothing. The sender owns delivery recovery — verdict first, then pane read, then resend — so a human pressing Enter is never the fallback. Broadcast protocol changes with an explicit do-not-acknowledge marker so the change itself does not trigger an ACK storm.
-6. Pane read is ground truth; ACKs arrive out of order and go stale. When correcting a mis-assignment, make the corrective message the last word in every affected queue, then verify convergence by pane read, not ACK.
-7. Verify claimed branches and commits in git before acting on any branch-ready claim.
-8. Do not reply to ACKs of ACKs.
-9. An ACK proves the recipient holds the content, not that your send delivered it: a capable recipient may pull the content by pane read before your message surfaces. Once the recipient has already acted on the content, do not resend after an `unconfirmed` verdict — the second submit starts a duplicate turn over work already done. Pane read first.
-10. Do not shell a bare `agent wait` and trust `--timeout`; the flag is ignored on 0.7.2-preview and the command blocks until the state arrives. The wrapper bounds its own delivery wait with a watchdog — bound yours the same way.
-11. Legacy keystroke transport only (`HERDR_SHEPHERD_TRANSPORT=keystrokes`, typed text plus a delayed Enter): the send races the target composer. A long send that loses the race arrives with its first 1024 characters dropped, so number multi-point sends (part 1/2, part 2/2) and recover truncated text from the sender's session log; the typed Enter can be swallowed by TUI state, leaving the message stuck in the composer — verify within about 20 seconds and resend, and sweep panes for stuck composers on each coordination wake. On that transport a stuck composer is indistinguishable from understood.
+1. Send the message verbatim, and keep it compact. Substance goes to the durable record first; the send carries the pointer.
+2. **Establish a delivery verdict rather than assuming one.** Only positive evidence that the peer began a new turn counts as delivered. A peer that was already busy leaves delivery and non-delivery indistinguishable — read its session later rather than resending blind. A failed probe is unknown, not delivered.
+3. **Never send to a peer blocked on human input.** Resolve the block first; deliberate interaction with a prompt is an explicit keystroke, never a message send.
+4. A message explicitly marked ACK-requested still requires a compact ACK: silence proves nothing, and an ambiguous verdict cannot distinguish delivered from still-pending. The sender owns delivery recovery — verdict, then session read, then resend — so a human pressing Enter is never the fallback. Broadcast protocol changes with an explicit do-not-acknowledge marker so the change itself does not trigger an ACK storm.
+5. Session read is ground truth; ACKs arrive out of order and go stale. When correcting a mis-assignment, make the corrective message the last word in every affected queue, then verify convergence by session read, not ACK.
+6. Verify claimed branches and commits in git before acting on any branch-ready claim.
+7. Do not reply to ACKs of ACKs.
+8. An ACK proves the recipient holds the content, not that your send delivered it: a capable recipient may pull the content by session read before your message ever surfaces. Once the recipient has acted on the content, do not resend on an inconclusive verdict — the second submit starts a duplicate turn over work already done. Read first.
+9. Bound every wait with your own watchdog. A tool's own timeout flag may be advisory or ignored, and a wait that blocks forever looks exactly like a peer that never responded.
 
 ## Routing Substance and Pointers
 
@@ -178,29 +149,29 @@ Route by how long the content needs to survive:
 | Tier | Content | Channel |
 |---|---|---|
 | Durable | Findings, verdicts, decisions and their rationale, blockers, plans, declined alternatives, status | Durable record (tracker issue, or the fallback in Durable Record Setup) |
-| Pointer | "ALP-135 updated, review comment added, needs your call on the drain deadline" | `agent send`, referencing the record ID |
-| Ephemeral | ACKs, liveness, lane claims, standing down | Pane read or `agent send`; never the durable record |
+| Pointer | "ALP-135 updated, review comment added, needs your call on the drain deadline" | A send, referencing the record ID |
+| Ephemeral | ACKs, liveness, lane claims, standing down | Session read or a send; never the durable record |
 
 Do not route everything to the durable record. Trackers do not push to a terminal agent, so a tracker round trip is far too slow for a collision warning; an issue whose thread is forty ACKs destroys the signal the record exists to carry; and most coordination — capability checks, lane claims, "are you idle" — has no issue to attach to.
 
-Pane read is the only channel that cannot be dropped, because it is a pull. It complements the pointer send; it does not replace it.
+A pull-based session read is the only channel that cannot be dropped. It complements the pointer send; it does not replace it.
 
 ### Attribution in the durable record
 
 Most trackers are reached through one shared credential, so every agent's issue and comment is authored by the human who owns the token. The tracker's own author field cannot tell two agents apart. Attribution must therefore be written into the body:
 
 ```text
-Requested by: <runtime> (<pane>) - <role>
-Performed by: <runtime> (<pane>) - <role>
+Requested by: <runtime> (<session>) - <role>
+Performed by: <runtime> (<session>) - <role>
 Date: <ISO date>
 Scope: <what this agent was and was not allowed to do>
 ```
 
-Pane IDs are slot identifiers and get reused, so `w2:pJ` means nothing weeks later. The role is the durable half — "spec owner" and "independent reviewer" still parse after the panes are gone. Record the pane as a dated breadcrumb, not as identity.
+Session identifiers are slots and get reused, so `w2:pJ` means nothing weeks later. The role is the durable half — "spec owner" and "independent reviewer" still parse after the sessions are gone. Record the identifier as a dated breadcrumb, not as identity.
 
 ## Durable Record Setup
 
-When a repository has no durable record bound yet, establish one before relying on pointer sends. Do not silently invent a location, and do not fall back to pane scrollback.
+When a repository has no durable record bound yet, establish one before relying on pointer sends. Do not silently invent a location, and do not fall back to session scrollback.
 
 1. **Check what is already reachable** before proposing anything: a connected tracker MCP server or CLI, a GitHub remote with `gh` authenticated, or neither. Never offer a tracker whose capability you have not confirmed in this session.
 2. **Offer the ranked options with a recommendation**, and let the user choose:
@@ -223,7 +194,7 @@ Treat missing credentials as a stop, not a workaround: ask the user to authentic
 
 ## Receiving Coordination Messages
 
-When a Herdr coordination message lands in your session, reply before doing substantial work so the sender knows it was actually seen. Keep it compact:
+When a coordination message lands in your session, reply before doing substantial work so the sender knows it was actually seen. Keep it compact:
 
 ```text
 ACK <event_id or source> - received; status: accepted|declined|needs-info
@@ -231,106 +202,40 @@ ACK <event_id or source> - received; status: accepted|declined|needs-info
 
 This acknowledgement is a coordination convention, not proof of transport delivery. If the message does not include an event id, acknowledge the visible source prefix and summarize what you accepted or need clarified.
 
-## Example
+## Working With a Session Multiplexer
 
-### Locate the wrapper first
+This skill owns coordination policy. Driving a specific multiplexer — enumerating sessions, reading them, lifecycle, waits — belongs to that tool's own skill, and duplicating it here only creates a second copy to drift.
 
-`coordinate.mjs` ships with the skill, so its path depends on the runtime and install. **Resolve it at first use in a session instead of trusting a remembered path** — a plugin update or reorganization moves it, and the stale path fails mid-session with `Cannot find module`, which looks nothing like a coordination problem:
+**Herdr.** When the work involves Herdr spaces, workspaces, tabs, panes, or agents:
 
-| Install | Wrapper path |
-|---|---|
-| Claude Code plugin | `~/.claude/plugins/cache/<marketplace>/herdr-shepherd/<version>/skills/herdr-shepherd/scripts/coordinate.mjs` |
-| Codex plugin | `~/.codex/plugins/herdr-shepherd/skills/herdr-shepherd/scripts/coordinate.mjs` |
-| Manual skill install | `<skill root>/scripts/coordinate.mjs` |
+1. **Check whether the native Herdr skill is available in this session** before relying on its commands. Do not guess at CLI syntax from memory.
+2. **If it is missing, say so and offer to install it** from the Herdr repository, rather than improvising. It is the source of truth for Herdr's own mechanics.
+3. **If the user declines, continue with reduced capability** and be explicit about which side of the line you are on. Everything in this skill that is about policy still applies — lane stacking, merge trains, worktree safety, durable records, routing, ACK discipline. What degrades is anything needing Herdr's CLI surface: enumerating peers, reading their sessions, and coordinated sends.
 
-The version segment changes on update, so glob for `**/coordinate.mjs` under the runtime's config directory rather than pinning one. Do not use a junction or symlink path such as `~/.claude/skills/...`; those intermittently fail to resolve for the Windows node process, and because the hook only audits and never delivers, a node that fails to start means nothing was sent.
-
-### Send
-
-After snapshot and pane-read show that `w2:p1` owns a paused installer build, pipe one literal JSON object to the wrapper. Under Claude Code use the Bash tool with a quoted heredoc — the PowerShell tool's string-to-native pipe prepends a UTF-8 BOM that breaks `--stdin` JSON parsing:
-
-```sh
-node "<wrapper path>" --stdin <<'JSON'
-{"origin":"proactive","action":"herdr.exec","args":["agent","send","w2:p1","Resume the official installer build and report blockers here."],"target":{"type":"agent","id":"w2:p1"},"reason":"Continue paused work without duplicating it","message":"Resume the official installer build and report blockers here."}
-JSON
-```
-
-Keep the JSON on one line and do not append a pipe or redirect to the heredoc; the hook rejects both. Where PowerShell is the only shell available, use a single-quoted here-string:
-
-```powershell
-@'
-{"origin":"proactive","action":"herdr.exec","args":["agent","send","w2:p1","Resume the official installer build and report blockers here."],"target":{"type":"agent","id":"w2:p1"},"reason":"Continue paused work without duplicating it","message":"Resume the official installer build and report blockers here."}
-'@ | node "<wrapper path>" --stdin
-```
-
-### Read the failure, do not guess it
-
-A successful send prints two lines: `coordination-wrapper: <name> <version> (<path>)` identifying which wrapper ran, then `coordination-delivery: <verdict>`. **No output at all means the wrapper never executed** — a path or environment problem, never a delivery verdict. Silence is not success.
-
-Three failures are easy to confuse, and the wrapper names which one it hit:
-
-- `target agent does not exist: <id>` — the CLI resolved the pane as absent. Re-snapshot; the pane id is wrong or gone.
-- `could not reach Herdr to verify <id>: ...` — the control socket dropped the probe after a retry. **The target is probably live.** Confirm with `herdr agent get <id>` and send again. Do not conclude that coordination is down, and do not record that conclusion anywhere durable.
-- `refusing to send unaudited: ...` — the PreToolUse hook did not run, so the send would leave no record. This is an auditing failure, not a transport one; the target is fine. See below.
-
-### When the audit hook is not running
-
-The wrapper requires proof that it was audited: the hook writes an `attempted` event *before* the command runs, so a matching event must already exist by the time the wrapper starts. If it does not, the wrapper refuses the send rather than mutating without a record.
-
-This is load-bearing, not defensive. One pane ran ten coordination sends with the hook silently not loaded; seven delivered with no audit entry anywhere, and nothing distinguished that pane from an audited one. An audit that fails open is indistinguishable from an audit that passes.
-
-On the refusal: confirm the skill's hooks are actually active in this session rather than assuming they are, since a session whose hook loading failed audits nothing and gives no other warning. A fresh pane is the usual fix. `HERDR_SHEPHERD_ALLOW_UNAUDITED=1` sends anyway and marks the output `audit=bypassed`; use it only when the user has accepted an unaudited mutation, never to make an inconvenient refusal go away.
-
-The hook records attempted and outcome events, redacts obvious secrets, and opens one loopback audit viewer tab per viewer process for proactive sends. The viewer defaults to the `succeeded` phase, which it displays as **sent**: the wrapper submitted the message, which is not proof the target read or acted on it. Treat the viewer as a record of what was attempted, and confirm delivery by the recorded verdict and pane read. Use **Viewed & close** to acknowledge; closing the tab alone leaves entries unseen and keeps the viewer process available for later updates.
-
-## Quick Reference
-
-| Need | Action |
-|---|---|
-| Discover other work | `herdr api snapshot` |
-| Rank who to read first | Status from the snapshot: `working` before `idle`/`done`; `blocked` goes to the user |
-| Question a status you do not believe | `herdr agent explain <id> --json` — names the matched rule, its screen region, and the manifest version |
-| Check a target's composer before sending | `herdr agent explain <id> --json`, `prompt_box_body` region preview; the wrapper enforces this |
-| Suspect parallel code changes | Match same-repo panes, read likely owners, message only for overlap |
-| Recover pane context | `herdr pane read <id> --source recent-unwrapped` |
-| Coordinate ownership | Audited `agent send` wrapper |
-| Share findings, verdicts, or decisions | Write to the durable record, then send its ID |
-| No durable record bound yet | Run Durable Record Setup before relying on pointer sends |
-| Perform user-requested mutation | Audited wrapper with `origin: user-directed` |
-| Inspect audit | Viewer opens one tab per viewer process after proactive sends, defaults to the `succeeded` phase shown as **sent** (submitted; the recorded verdict says whether delivery was confirmed), shows newest events first, and supports deleting one action or all history |
+Shepherd ships its own Herdr-specific enforcement that the native skill does not cover — an audited mutation wrapper, delivery verdicts, and hazards its code refuses on outright. Read [references/herdr-integration.md](references/herdr-integration.md) before the first coordinated mutation in a Herdr session, and [references/command-policy.md](references/command-policy.md) for the request contract.
 
 ## Common Mistakes
 
-- Do not say another Herdr tab is inaccessible. Snapshot and read it.
-- Do not search the repository, GitHub, or the web for paused Herdr work before inspecting Herdr.
-- Do not repeat work merely because another agent is idle; read its pane and stage a handoff when relevant.
-- Do not claim a submitted prompt started an agent turn until a later status read shows the agent working.
-- Do not place credentials in coordination messages. The wrapper blocks obvious secrets.
-- Do not put literal `Herdr <word>` prose *unquoted* inside unrelated shell command bodies. Quoted arguments are treated as data, so `grep "herdr agent send" log` is fine, but the classifier still scans unquoted text and heredoc bodies and may read prose there as a raw Herdr mutation. Quote the text or pass it another way.
-- Do not read wrapper silence as success. Every real run prints `coordination-wrapper:`; no output means the wrapper never started, so nothing was sent.
-- Do not assume your session is being audited. Verify that a send produced an `attempted` event before trusting the trail, and never reach for `HERDR_SHEPHERD_ALLOW_UNAUDITED=1` to clear a refusal the user has not accepted.
-- Do not report a failed status probe as a missing target. `could not reach Herdr to verify <id>` is a transport fault on the control socket; the pane is probably live. Confirm with `herdr agent get <id>` and retry rather than declaring coordination down.
-- Do not trust a remembered wrapper path. Resolve `coordinate.mjs` per session; a plugin update moves it and the stale path fails with `Cannot find module`, which reads like a coordination outage but is not one.
-- Do not conclude the coordination channel is down from one class of failure. The existence gate runs only for `proactive`, so `user-directed` sends can be delivering normally at the same moment proactive sends fail. Test both before reporting an outage.
+- Do not treat a dirty worktree alone as proof of parallel work.
+- Do not judge overlap by label. Read the other agent's plan; near-identical work often hides behind different names.
+- Do not repeat work merely because a peer is idle; read its session and stage a handoff when relevant.
+- Do not claim a submitted prompt started a peer's turn until positive evidence shows it working.
+- Do not rely on a submitted send to stop an imminent collision. It is a queued message, not an interrupt. Escalate time-critical conflicts to the user.
+- Do not send to a peer blocked on human input, and do not leave a blocked peer for someone else to notice. Surface it to the user on the coordination wake that found it; no message you can send will clear it.
+- Do not send to a peer whose input holds an unsubmitted draft; the send merges with it and submits both.
+- Do not read "unknown" liveness as idle. It means no agent was detected or that detection failed — different problems, and neither is safe to send to.
+- Do not treat liveness as evidence of what a peer is working on. It orders your reads; only the plan settles overlap.
+- Do not trust a tool's wait timeout without verifying it. Bound waits with your own watchdog.
+- Do not place credentials in coordination messages.
 - Do not `checkout`, `checkout -b`, `merge`, or `stash` in a shared working tree before confirming who holds it — you will sweep another agent's uncommitted work onto your branch.
 - Do not park on `main` in a worktree. It blocks the tree-holder's merge, and nothing tells you that you did it.
 - Do not create a worktree inside a cloud-synced folder. The sync client breaks its `.git` pointer file, and uncommitted work in it becomes unrecoverable.
 - Do not blame the sync client for a locked worktree. "Permission denied" or "Device or resource busy" almost always means a shell still has it as its working directory — usually your own, from an earlier inspection. Check whether `.git` is actually missing first.
 - Do not read an empty `git -C <dir> status` as a clean worktree. On a broken worktree the command fails and prints nothing, so counting output lines scores it identical to clean. Check the command succeeded before trusting the result.
-- Do not rely on a submitted `agent send` to stop an imminent collision. It is a queued message, not an interrupt. Escalate time-critical conflicts to the user.
-- Do not send to a `blocked` pane, and do not work around the wrapper's refusal. The submit's Enter answers the pending prompt with its default option and discards your message — it takes a decision on the user's behalf.
-- Do not leave a blocked pane for someone else to notice. Surface it to the user on the coordination wake that found it; no message you can send will clear it.
-- Do not send to a pane whose composer holds an unsubmitted draft. The send merges with the draft and force-submits both as one message; the wrapper refuses on a positive reading, and `HERDR_SHEPHERD_ALLOW_DIRTY_COMPOSER=1` is for a merge the user accepted, not for clearing an inconvenient refusal.
-- Do not read `unknown` as idle. It means no agent was detected or that detection failed — different problems, and neither is safe to send to.
-- Do not wait on `done`. It is a UI attention state rather than a lifecycle one, and Herdr's `done` says nothing about a tracker's Done column.
-- Do not treat status as evidence of what an agent is working on. It orders your reads; only the plan settles overlap.
-- Do not trust `agent wait --timeout`; the flag is ignored and the command blocks until the state arrives. Bound waits with your own watchdog, as the wrapper does.
-- Do not inline long payloads in a send even though the default transport delivers them intact. Substance belongs in the durable record; the legacy keystroke transport still head-truncates at 1024 characters.
-- Do not judge overlap by tab label. Read the other agent's plan; near-identical work often hides behind different names.
-- Do not treat a dirty worktree alone as proof of parallel work.
-- Do not treat an ACK as proof your send was submitted. The recipient may have pulled the content by pane read while your message sat unsubmitted.
-- Do not resend to flush a stuck composer once the recipient has acted on the content; that submits a duplicate. Have the user clear it.
+- Do not treat an ACK as proof your send was submitted. The recipient may have pulled the content by session read while your message sat unsubmitted.
+- Do not resend to flush a stuck input once the recipient has acted on the content; that submits a duplicate. Have the user clear it.
 - Do not make a send the only carrier of a finding, verdict, or decision. Write it to the durable record first and send the ID.
 - Do not route ACKs, liveness, or lane claims into the durable record; that noise destroys the signal the record exists to carry.
 - Do not rely on a tracker's author field to identify an agent. One shared credential means every agent writes as the human; put attribution in the body.
 - Do not invent a durable location when none is bound. Run Durable Record Setup and let the user choose.
+- Do not improvise a multiplexer's CLI from memory when its own skill is unavailable. Ask for the skill, or say plainly which capabilities are degraded without it.
